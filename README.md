@@ -5,3 +5,4 @@ GitHub repository for the project of the distributed systems course academic yea
 | Name |ID|
 |---|---|
 |Fabio Carminati|919803|
+|Filippo Carloni|921124|
