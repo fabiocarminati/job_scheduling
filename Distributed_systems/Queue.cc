@@ -11,7 +11,8 @@ private:
     int src_id,E,N,port_id;
     double job_id;
 protected:
-virtual void initialize();
+    cQueue queue;
+virtual void initialize() override;
 virtual void handleMessage(cMessage *msg) override;
 };
 Define_Module(Queue);
@@ -57,28 +58,51 @@ void Queue::handleMessage(cMessage *cmsg) {
       msgServiced->setHasEnded(true);
       // Notify the end of the computation to the input user
       send(msgServiced, "exec$o",port_id);//is it correct id as output? think about it;---thinks about :end of computing+element in the queue:msgserviced=msgfrom the queue
-   }
+      if(queue.isEmpty()){
+         EV<<"Empty queue, the machine "<<msgServiced->getExecId()<<" goes IDLE"<<endl;
+         msgServiced = nullptr;
+        //emit(busySignal, false);    // Magari puo servire
+         }
+              else{ // at least one queue contains users
+                  // i has the value of the highest priority
+                  msgServiced = (msg_check *)queue.pop(); //remove the first element of that queue(FIFO policy)
+                  //workDone = msgServiced->getAlreadyDone(); //recover the partial service time execution previously done
+                  msgServiced->setResidualTime(expPar);  //attenzione che e volatile magari in schedule at e ricalcolato con un diverso valore
+                  job_id= msgServiced->getJobId();
+                  src_id=msgServiced->getSourceId();
+                  EV<<"Starting service of "<<job_id<<" coming from user ID "<<src_id<<" from the queue of the machine "<<msgServiced->getExecId()<<endl;
+                  //serviceTime = exponential(expPar); //defines the service time
+                  scheduleAt(simTime()+expPar, endServiceMsg);
+                  //EV<<"serviceTime= "<<expPar<<endl;
+              }
+       }
+
    else{
-       if (!msgServiced){      // Server is IDLE, there's no message in service
+       if (!msgServiced){      // Server is IDLE, there's no message in service:execute the one that has arrived right now or put it in the queue
+           EV<<"EMPTY queue immediate service "<<endl;
            // Direct service
            msgServiced = msg; //given that the server is idle the arrived message is immediately served despite his priority
-           msgServiced->setResidualTime(SIMTIME_ZERO);
+           msgServiced->setResidualTime(expPar);
            // save the time when the packet has been served for the first time (useful for per class extended service time)
            job_id= msgServiced->getJobId();
            src_id=msgServiced->getSourceId();
            EV<<"Starting service of "<<job_id<<" coming from user ID "<<src_id<<endl;
            //serviceTime = exponential(expPar); //defines the service time
            scheduleAt(simTime()+expPar, endServiceMsg);
-           EV<<"serviceTime= "<<expPar<<endl;
-
-       }
+           //EV<<"serviceTime= "<<expPar<<endl;
+           }
+           else{
+               queue.insert(msg);  //ovviamente non ce load balncing tra le varie machine ancora
+               EV<<"QUEUE msg ID "<<job_id<<" coming from user ID "<<src_id<<" goes in the queue of the machine ID"<<msg->getExecId()<<endl;
+               }
 
 
       //queueingTime = msgServiced->getStartingTime() - msgServiced->getTimestamp() - msgServiced->getAlreadyDone();
      // emit(queueingTimeSignals[priority], queueingTime);
      // emit(genericQueueingTimeSignal, queueingTime);
      // EV<<"queueingTime = "<<queueingTime<<endl;
-   }
+       }
+
 
 
 }

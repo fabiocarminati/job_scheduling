@@ -35,17 +35,17 @@ void Source::handleMessage(cMessage *cmsg) {
 
         msg_check *message = new msg_check(msgname);
         interArrivalTime=exponential(par("interArrivalTime").doubleValue()); //collect the interarrival time as parameter
-        EV<<"interArrivalTime "<<id<<" = "<<interArrivalTime<<endl;
+        //EV<<"interArrivalTime "<<id<<" = "<<interArrivalTime<<endl;
         message->setHasEnded(false);  //set message priority
         message->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
         //message->setWaitingTime(SIMTIME_ZERO);
         message->setJobId(nbGenMessages); //will be useful for computing the per class extended service time
         message->setSourceId(id);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
         dst=uniform(N+2,N+E+1);
-        EV<<" dst "<<dst<<endl ;
+        //EV<<" dst "<<dst<<endl ;
         output=dst-N-2;
         message->setExecId(output);
-        EV<<"output port "<<output<<endl;
+        EV<<"destination machine "<<output<<" output port of the user"<<output<<endl;
         send(message,"user$o",output);  //send the message to the queue
         scheduleAt(simTime()+interArrivalTime, sendMessageEvent);  //self call that the i-th source makes to generate a new packet with the same priority of the previous ones
 

@@ -1,0 +1,198 @@
+version 2
+run Non-preemptive-0-20191206-18:49:22-3748
+attr configname Non-preemptive
+attr datetime 20191206-18:49:22
+attr experiment Non-preemptive
+attr inifile omnetpp.ini
+attr iterationvars ""
+attr iterationvarsf ""
+attr measurement ""
+attr network Net
+attr processid 3748
+attr repetition 0
+attr replication #0
+attr resultdir results
+attr runnumber 0
+attr seedset 0
+param **.N 3
+param **.E 8
+param **.gen[*].interArrivalTime 0.7s
+param **.machine[*].defServiceTime 0.8s
+
+scalar Net.machine[0] genericAvgQueueLength:timeavg nan
+attr interpolationmode sample-hold
+attr title "Overall average queue length, timeavg"
+scalar Net.machine[0] genericResponseTime:mean nan
+attr interpolationmode none
+attr title "Overall response time at end of service, mean"
+attr unit s
+scalar Net.machine[0] genericResponseTime:max nan
+attr interpolationmode none
+attr title "Overall response time at end of service, max"
+attr unit s
+scalar Net.machine[0] genericQueueingTime:mean nan
+attr interpolationmode none
+attr title "Overall queueing time, mean"
+attr unit s
+scalar Net.machine[0] genericQueueingTime:max nan
+attr interpolationmode none
+attr title "Overall queueing time, max"
+attr unit s
+scalar Net.machine[0] busy:timeavg nan
+attr interpolationmode sample-hold
+attr title "Server busy state, timeavg"
+scalar Net.machine[1] genericAvgQueueLength:timeavg nan
+attr interpolationmode sample-hold
+attr title "Overall average queue length, timeavg"
+scalar Net.machine[1] genericResponseTime:mean nan
+attr interpolationmode none
+attr title "Overall response time at end of service, mean"
+attr unit s
+scalar Net.machine[1] genericResponseTime:max nan
+attr interpolationmode none
+attr title "Overall response time at end of service, max"
+attr unit s
+scalar Net.machine[1] genericQueueingTime:mean nan
+attr interpolationmode none
+attr title "Overall queueing time, mean"
+attr unit s
+scalar Net.machine[1] genericQueueingTime:max nan
+attr interpolationmode none
+attr title "Overall queueing time, max"
+attr unit s
+scalar Net.machine[1] busy:timeavg nan
+attr interpolationmode sample-hold
+attr title "Server busy state, timeavg"
+scalar Net.machine[2] genericAvgQueueLength:timeavg nan
+attr interpolationmode sample-hold
+attr title "Overall average queue length, timeavg"
+scalar Net.machine[2] genericResponseTime:mean nan
+attr interpolationmode none
+attr title "Overall response time at end of service, mean"
+attr unit s
+scalar Net.machine[2] genericResponseTime:max nan
+attr interpolationmode none
+attr title "Overall response time at end of service, max"
+attr unit s
+scalar Net.machine[2] genericQueueingTime:mean nan
+attr interpolationmode none
+attr title "Overall queueing time, mean"
+attr unit s
+scalar Net.machine[2] genericQueueingTime:max nan
+attr interpolationmode none
+attr title "Overall queueing time, max"
+attr unit s
+scalar Net.machine[2] busy:timeavg nan
+attr interpolationmode sample-hold
+attr title "Server busy state, timeavg"
+scalar Net.machine[3] genericAvgQueueLength:timeavg nan
+attr interpolationmode sample-hold
+attr title "Overall average queue length, timeavg"
+scalar Net.machine[3] genericResponseTime:mean nan
+attr interpolationmode none
+attr title "Overall response time at end of service, mean"
+attr unit s
+scalar Net.machine[3] genericResponseTime:max nan
+attr interpolationmode none
+attr title "Overall response time at end of service, max"
+attr unit s
+scalar Net.machine[3] genericQueueingTime:mean nan
+attr interpolationmode none
+attr title "Overall queueing time, mean"
+attr unit s
+scalar Net.machine[3] genericQueueingTime:max nan
+attr interpolationmode none
+attr title "Overall queueing time, max"
+attr unit s
+scalar Net.machine[3] busy:timeavg nan
+attr interpolationmode sample-hold
+attr title "Server busy state, timeavg"
+scalar Net.machine[4] genericAvgQueueLength:timeavg nan
+attr interpolationmode sample-hold
+attr title "Overall average queue length, timeavg"
+scalar Net.machine[4] genericResponseTime:mean nan
+attr interpolationmode none
+attr title "Overall response time at end of service, mean"
+attr unit s
+scalar Net.machine[4] genericResponseTime:max nan
+attr interpolationmode none
+attr title "Overall response time at end of service, max"
+attr unit s
+scalar Net.machine[4] genericQueueingTime:mean nan
+attr interpolationmode none
+attr title "Overall queueing time, mean"
+attr unit s
+scalar Net.machine[4] genericQueueingTime:max nan
+attr interpolationmode none
+attr title "Overall queueing time, max"
+attr unit s
+scalar Net.machine[4] busy:timeavg nan
+attr interpolationmode sample-hold
+attr title "Server busy state, timeavg"
+scalar Net.machine[5] genericAvgQueueLength:timeavg nan
+attr interpolationmode sample-hold
+attr title "Overall average queue length, timeavg"
+scalar Net.machine[5] genericResponseTime:mean nan
+attr interpolationmode none
+attr title "Overall response time at end of service, mean"
+attr unit s
+scalar Net.machine[5] genericResponseTime:max nan
+attr interpolationmode none
+attr title "Overall response time at end of service, max"
+attr unit s
+scalar Net.machine[5] genericQueueingTime:mean nan
+attr interpolationmode none
+attr title "Overall queueing time, mean"
+attr unit s
+scalar Net.machine[5] genericQueueingTime:max nan
+attr interpolationmode none
+attr title "Overall queueing time, max"
+attr unit s
+scalar Net.machine[5] busy:timeavg nan
+attr interpolationmode sample-hold
+attr title "Server busy state, timeavg"
+scalar Net.machine[6] genericAvgQueueLength:timeavg nan
+attr interpolationmode sample-hold
+attr title "Overall average queue length, timeavg"
+scalar Net.machine[6] genericResponseTime:mean nan
+attr interpolationmode none
+attr title "Overall response time at end of service, mean"
+attr unit s
+scalar Net.machine[6] genericResponseTime:max nan
+attr interpolationmode none
+attr title "Overall response time at end of service, max"
+attr unit s
+scalar Net.machine[6] genericQueueingTime:mean nan
+attr interpolationmode none
+attr title "Overall queueing time, mean"
+attr unit s
+scalar Net.machine[6] genericQueueingTime:max nan
+attr interpolationmode none
+attr title "Overall queueing time, max"
+attr unit s
+scalar Net.machine[6] busy:timeavg nan
+attr interpolationmode sample-hold
+attr title "Server busy state, timeavg"
+scalar Net.machine[7] genericAvgQueueLength:timeavg nan
+attr interpolationmode sample-hold
+attr title "Overall average queue length, timeavg"
+scalar Net.machine[7] genericResponseTime:mean nan
+attr interpolationmode none
+attr title "Overall response time at end of service, mean"
+attr unit s
+scalar Net.machine[7] genericResponseTime:max nan
+attr interpolationmode none
+attr title "Overall response time at end of service, max"
+attr unit s
+scalar Net.machine[7] genericQueueingTime:mean nan
+attr interpolationmode none
+attr title "Overall queueing time, mean"
+attr unit s
+scalar Net.machine[7] genericQueueingTime:max nan
+attr interpolationmode none
+attr title "Overall queueing time, max"
+attr unit s
+scalar Net.machine[7] busy:timeavg nan
+attr interpolationmode sample-hold
+attr title "Server busy state, timeavg"
+
