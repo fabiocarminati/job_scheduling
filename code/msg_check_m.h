@@ -29,6 +29,9 @@
  *     int ActualExecId;
  *     simtime_t ResidualTime;
  *     bool HasEnded;
+ *     int QueueLength;
+ *     bool Probing;
+ *     bool Probed;
  * }
  * 
  * //packet msg_backup extends msg_check //name of the new type of message 
@@ -44,6 +47,9 @@ class msg_check : public ::omnetpp::cPacket
     int ActualExecId;
     ::omnetpp::simtime_t ResidualTime;
     bool HasEnded;
+    int QueueLength;
+    bool Probing;
+    bool Probed;
 
   private:
     void copy(const msg_check& other);
@@ -74,6 +80,12 @@ class msg_check : public ::omnetpp::cPacket
     virtual void setResidualTime(::omnetpp::simtime_t ResidualTime);
     virtual bool getHasEnded() const;
     virtual void setHasEnded(bool HasEnded);
+    virtual int getQueueLength() const;
+    virtual void setQueueLength(int QueueLength);
+    virtual bool getProbing() const;
+    virtual void setProbing(bool Probing);
+    virtual bool getProbed() const;
+    virtual void setProbed(bool Probed);
 };
 
 inline void doParsimPacking(omnetpp::cCommBuffer *b, const msg_check& obj) {obj.parsimPack(b);}

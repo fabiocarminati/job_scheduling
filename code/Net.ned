@@ -21,6 +21,8 @@ network Net
             gates:
             	exec[N];
             	backup_send;
+            	load_receive[E];
+        		load_send[E];
         }
 		//decido di fare delete del msg direttamente nelle queue
         //sink: Sink {
@@ -43,6 +45,13 @@ network Net
         for k=0..E-1 {
             // gen[i].out --> queue.in++;
             machine[k].backup_send <--> backup.backup_rec[k];
+
+        }
+        for k=0..E-1,for r=0..E-1{
+            // gen[i].out --> queue.in++;
+
+            machine[k].load_send[r]-->  machine[r].load_receive[k];
+
         }
 
 }

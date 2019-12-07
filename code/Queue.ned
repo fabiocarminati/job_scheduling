@@ -47,4 +47,6 @@ simple Queue
     gates:
         inout exec[];
         inout backup_send;
+        input load_receive[];
+        output load_send[];
 }

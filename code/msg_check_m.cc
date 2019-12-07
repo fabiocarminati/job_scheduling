@@ -186,6 +186,9 @@ msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kin
     this->ActualExecId = 0;
     this->ResidualTime = 0;
     this->HasEnded = false;
+    this->QueueLength = 0;
+    this->Probing = false;
+    this->Probed = false;
 }
 
 msg_check::msg_check(const msg_check& other) : ::omnetpp::cPacket(other)
@@ -213,6 +216,9 @@ void msg_check::copy(const msg_check& other)
     this->ActualExecId = other.ActualExecId;
     this->ResidualTime = other.ResidualTime;
     this->HasEnded = other.HasEnded;
+    this->QueueLength = other.QueueLength;
+    this->Probing = other.Probing;
+    this->Probed = other.Probed;
 }
 
 void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
@@ -224,6 +230,9 @@ void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
     doParsimPacking(b,this->ActualExecId);
     doParsimPacking(b,this->ResidualTime);
     doParsimPacking(b,this->HasEnded);
+    doParsimPacking(b,this->QueueLength);
+    doParsimPacking(b,this->Probing);
+    doParsimPacking(b,this->Probed);
 }
 
 void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
@@ -235,6 +244,9 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->ActualExecId);
     doParsimUnpacking(b,this->ResidualTime);
     doParsimUnpacking(b,this->HasEnded);
+    doParsimUnpacking(b,this->QueueLength);
+    doParsimUnpacking(b,this->Probing);
+    doParsimUnpacking(b,this->Probed);
 }
 
 const char * msg_check::getJobId() const
@@ -295,6 +307,36 @@ bool msg_check::getHasEnded() const
 void msg_check::setHasEnded(bool HasEnded)
 {
     this->HasEnded = HasEnded;
+}
+
+int msg_check::getQueueLength() const
+{
+    return this->QueueLength;
+}
+
+void msg_check::setQueueLength(int QueueLength)
+{
+    this->QueueLength = QueueLength;
+}
+
+bool msg_check::getProbing() const
+{
+    return this->Probing;
+}
+
+void msg_check::setProbing(bool Probing)
+{
+    this->Probing = Probing;
+}
+
+bool msg_check::getProbed() const
+{
+    return this->Probed;
+}
+
+void msg_check::setProbed(bool Probed)
+{
+    this->Probed = Probed;
 }
 
 class msg_checkDescriptor : public omnetpp::cClassDescriptor
@@ -362,7 +404,7 @@ const char *msg_checkDescriptor::getProperty(const char *propertyname) const
 int msg_checkDescriptor::getFieldCount() const
 {
     omnetpp::cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 6+basedesc->getFieldCount() : 6;
+    return basedesc ? 9+basedesc->getFieldCount() : 9;
 }
 
 unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
@@ -380,8 +422,11 @@ unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISEDITABLE,
+        FD_ISEDITABLE,
+        FD_ISEDITABLE,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<6) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<9) ? fieldTypeFlags[field] : 0;
 }
 
 const char *msg_checkDescriptor::getFieldName(int field) const
@@ -399,8 +444,11 @@ const char *msg_checkDescriptor::getFieldName(int field) const
         "ActualExecId",
         "ResidualTime",
         "HasEnded",
+        "QueueLength",
+        "Probing",
+        "Probed",
     };
-    return (field>=0 && field<6) ? fieldNames[field] : nullptr;
+    return (field>=0 && field<9) ? fieldNames[field] : nullptr;
 }
 
 int msg_checkDescriptor::findField(const char *fieldName) const
@@ -413,6 +461,9 @@ int msg_checkDescriptor::findField(const char *fieldName) const
     if (fieldName[0]=='A' && strcmp(fieldName, "ActualExecId")==0) return base+3;
     if (fieldName[0]=='R' && strcmp(fieldName, "ResidualTime")==0) return base+4;
     if (fieldName[0]=='H' && strcmp(fieldName, "HasEnded")==0) return base+5;
+    if (fieldName[0]=='Q' && strcmp(fieldName, "QueueLength")==0) return base+6;
+    if (fieldName[0]=='P' && strcmp(fieldName, "Probing")==0) return base+7;
+    if (fieldName[0]=='P' && strcmp(fieldName, "Probed")==0) return base+8;
     return basedesc ? basedesc->findField(fieldName) : -1;
 }
 
@@ -431,8 +482,11 @@ const char *msg_checkDescriptor::getFieldTypeString(int field) const
         "int",
         "simtime_t",
         "bool",
+        "int",
+        "bool",
+        "bool",
     };
-    return (field>=0 && field<6) ? fieldTypeStrings[field] : nullptr;
+    return (field>=0 && field<9) ? fieldTypeStrings[field] : nullptr;
 }
 
 const char **msg_checkDescriptor::getFieldPropertyNames(int field) const
@@ -505,6 +559,9 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
         case 3: return long2string(pp->getActualExecId());
         case 4: return simtime2string(pp->getResidualTime());
         case 5: return bool2string(pp->getHasEnded());
+        case 6: return long2string(pp->getQueueLength());
+        case 7: return bool2string(pp->getProbing());
+        case 8: return bool2string(pp->getProbed());
         default: return "";
     }
 }
@@ -525,6 +582,9 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
         case 3: pp->setActualExecId(string2long(value)); return true;
         case 4: pp->setResidualTime(string2simtime(value)); return true;
         case 5: pp->setHasEnded(string2bool(value)); return true;
+        case 6: pp->setQueueLength(string2long(value)); return true;
+        case 7: pp->setProbing(string2bool(value)); return true;
+        case 8: pp->setProbed(string2bool(value)); return true;
         default: return false;
     }
 }

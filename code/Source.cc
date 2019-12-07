@@ -42,6 +42,8 @@ void Source::handleMessage(cMessage *cmsg) {
         interArrivalTime=exponential(par("interArrivalTime").doubleValue()); //collect the interarrival time as parameter
         //EV<<"interArrivalTime "<<id<<" = "<<interArrivalTime<<endl;
         message->setHasEnded(false);  //set message priority
+        message->setProbing(false);
+        message->setProbed(false);
         message->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
         //message->setWaitingTime(SIMTIME_ZERO);
         message->setJobId(0); //will be useful for computing the per class extended service time
@@ -59,12 +61,14 @@ void Source::handleMessage(cMessage *cmsg) {
     else{
         if(msg->getHasEnded()==true){//end of processing
             EV<<"end of computation "<<msg->getJobId()<<endl;
+            workInProgress.erase(msg->getJobId()); //delete the job id
             delete msg;
             }
 
         else{ //notify to the user the jobid
             workInProgress.insert({msg->getJobId(),msg->getOriginalExecId()});
             EV<<"As a user "<<id<<" "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
+
             }
     }
 
