@@ -1,6 +1,7 @@
 #include <string.h>
 #include <omnetpp.h>
 #include <msg_check_m.h>
+//#include <msg_backup_m.h>
 using namespace omnetpp;
 class Source : public cSimpleModule {
 private:
@@ -44,7 +45,8 @@ void Source::handleMessage(cMessage *cmsg) {
         dst=uniform(N+2,N+E+1);
         //EV<<" dst "<<dst<<endl ;
         output=dst-N-2;
-        message->setExecId(output);
+        message->setActualExecId(output);
+        message->setOriginalExecId(output);
         EV<<"destination machine "<<output<<" output port of the user"<<output<<endl;
         send(message,"user$o",output);  //send the message to the queue
         scheduleAt(simTime()+interArrivalTime, sendMessageEvent);  //self call that the i-th source makes to generate a new packet with the same priority of the previous ones

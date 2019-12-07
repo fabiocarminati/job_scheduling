@@ -17,21 +17,32 @@ network Net
 
        machine[E]: Queue {
             parameters:
-                @display("p=354,245,c,90");
+                @display("p=354,60,c,90");
             gates:
             	exec[N];
+            	backup_send;
         }
 		//decido di fare delete del msg direttamente nelle queue
         //sink: Sink {
         //    parameters:
         //        @display("p=634,245");
         //}
+        backup:Storage{
+            parameters:
+                @display("p=150,10,c,90");
+            gates:
+            	backup_rec[E];
+        
+        }
     connections:
 		for i=0..N-1, for j=0..E-1 {
             // gen[i].out --> queue.in++;
             gen[i].user[j] <--> machine[j].exec[i];
 
         }
-
+        for k=0..E-1 {
+            // gen[i].out --> queue.in++;
+            machine[k].backup_send <--> backup.backup_rec[k];
+        }
 
 }

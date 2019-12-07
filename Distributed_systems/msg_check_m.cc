@@ -183,7 +183,8 @@ msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kin
 {
     this->JobId = 0;
     this->SourceId = 0;
-    this->ExecId = 0;
+    this->OriginalExecId = 0;
+    this->ActualExecId = 0;
     this->ResidualTime = 0;
     this->HasEnded = false;
 }
@@ -209,7 +210,8 @@ void msg_check::copy(const msg_check& other)
 {
     this->JobId = other.JobId;
     this->SourceId = other.SourceId;
-    this->ExecId = other.ExecId;
+    this->OriginalExecId = other.OriginalExecId;
+    this->ActualExecId = other.ActualExecId;
     this->ResidualTime = other.ResidualTime;
     this->HasEnded = other.HasEnded;
 }
@@ -219,7 +221,8 @@ void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
     ::omnetpp::cPacket::parsimPack(b);
     doParsimPacking(b,this->JobId);
     doParsimPacking(b,this->SourceId);
-    doParsimPacking(b,this->ExecId);
+    doParsimPacking(b,this->OriginalExecId);
+    doParsimPacking(b,this->ActualExecId);
     doParsimPacking(b,this->ResidualTime);
     doParsimPacking(b,this->HasEnded);
 }
@@ -229,7 +232,8 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     ::omnetpp::cPacket::parsimUnpack(b);
     doParsimUnpacking(b,this->JobId);
     doParsimUnpacking(b,this->SourceId);
-    doParsimUnpacking(b,this->ExecId);
+    doParsimUnpacking(b,this->OriginalExecId);
+    doParsimUnpacking(b,this->ActualExecId);
     doParsimUnpacking(b,this->ResidualTime);
     doParsimUnpacking(b,this->HasEnded);
 }
@@ -254,14 +258,24 @@ void msg_check::setSourceId(int SourceId)
     this->SourceId = SourceId;
 }
 
-int msg_check::getExecId() const
+int msg_check::getOriginalExecId() const
 {
-    return this->ExecId;
+    return this->OriginalExecId;
 }
 
-void msg_check::setExecId(int ExecId)
+void msg_check::setOriginalExecId(int OriginalExecId)
 {
-    this->ExecId = ExecId;
+    this->OriginalExecId = OriginalExecId;
+}
+
+int msg_check::getActualExecId() const
+{
+    return this->ActualExecId;
+}
+
+void msg_check::setActualExecId(int ActualExecId)
+{
+    this->ActualExecId = ActualExecId;
 }
 
 ::omnetpp::simtime_t msg_check::getResidualTime() const
@@ -349,7 +363,7 @@ const char *msg_checkDescriptor::getProperty(const char *propertyname) const
 int msg_checkDescriptor::getFieldCount() const
 {
     omnetpp::cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 5+basedesc->getFieldCount() : 5;
+    return basedesc ? 6+basedesc->getFieldCount() : 6;
 }
 
 unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
@@ -366,8 +380,9 @@ unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISEDITABLE,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<5) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<6) ? fieldTypeFlags[field] : 0;
 }
 
 const char *msg_checkDescriptor::getFieldName(int field) const
@@ -381,11 +396,12 @@ const char *msg_checkDescriptor::getFieldName(int field) const
     static const char *fieldNames[] = {
         "JobId",
         "SourceId",
-        "ExecId",
+        "OriginalExecId",
+        "ActualExecId",
         "ResidualTime",
         "HasEnded",
     };
-    return (field>=0 && field<5) ? fieldNames[field] : nullptr;
+    return (field>=0 && field<6) ? fieldNames[field] : nullptr;
 }
 
 int msg_checkDescriptor::findField(const char *fieldName) const
@@ -394,9 +410,10 @@ int msg_checkDescriptor::findField(const char *fieldName) const
     int base = basedesc ? basedesc->getFieldCount() : 0;
     if (fieldName[0]=='J' && strcmp(fieldName, "JobId")==0) return base+0;
     if (fieldName[0]=='S' && strcmp(fieldName, "SourceId")==0) return base+1;
-    if (fieldName[0]=='E' && strcmp(fieldName, "ExecId")==0) return base+2;
-    if (fieldName[0]=='R' && strcmp(fieldName, "ResidualTime")==0) return base+3;
-    if (fieldName[0]=='H' && strcmp(fieldName, "HasEnded")==0) return base+4;
+    if (fieldName[0]=='O' && strcmp(fieldName, "OriginalExecId")==0) return base+2;
+    if (fieldName[0]=='A' && strcmp(fieldName, "ActualExecId")==0) return base+3;
+    if (fieldName[0]=='R' && strcmp(fieldName, "ResidualTime")==0) return base+4;
+    if (fieldName[0]=='H' && strcmp(fieldName, "HasEnded")==0) return base+5;
     return basedesc ? basedesc->findField(fieldName) : -1;
 }
 
@@ -412,10 +429,11 @@ const char *msg_checkDescriptor::getFieldTypeString(int field) const
         "int",
         "int",
         "int",
+        "int",
         "simtime_t",
         "bool",
     };
-    return (field>=0 && field<5) ? fieldTypeStrings[field] : nullptr;
+    return (field>=0 && field<6) ? fieldTypeStrings[field] : nullptr;
 }
 
 const char **msg_checkDescriptor::getFieldPropertyNames(int field) const
@@ -484,9 +502,10 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
     switch (field) {
         case 0: return long2string(pp->getJobId());
         case 1: return long2string(pp->getSourceId());
-        case 2: return long2string(pp->getExecId());
-        case 3: return simtime2string(pp->getResidualTime());
-        case 4: return bool2string(pp->getHasEnded());
+        case 2: return long2string(pp->getOriginalExecId());
+        case 3: return long2string(pp->getActualExecId());
+        case 4: return simtime2string(pp->getResidualTime());
+        case 5: return bool2string(pp->getHasEnded());
         default: return "";
     }
 }
@@ -503,9 +522,10 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
     switch (field) {
         case 0: pp->setJobId(string2long(value)); return true;
         case 1: pp->setSourceId(string2long(value)); return true;
-        case 2: pp->setExecId(string2long(value)); return true;
-        case 3: pp->setResidualTime(string2simtime(value)); return true;
-        case 4: pp->setHasEnded(string2bool(value)); return true;
+        case 2: pp->setOriginalExecId(string2long(value)); return true;
+        case 3: pp->setActualExecId(string2long(value)); return true;
+        case 4: pp->setResidualTime(string2simtime(value)); return true;
+        case 5: pp->setHasEnded(string2bool(value)); return true;
         default: return false;
     }
 }

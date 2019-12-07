@@ -25,10 +25,14 @@
  * {
  *     int JobId;
  *     int SourceId;
- *     int ExecId;
+ *     int OriginalExecId;
+ *     int ActualExecId;
  *     simtime_t ResidualTime;
  *     bool HasEnded;
  * }
+ * 
+ * //packet msg_backup extends msg_check //name of the new type of message 
+ * //{
  * </pre>
  */
 class msg_check : public ::omnetpp::cPacket
@@ -36,7 +40,8 @@ class msg_check : public ::omnetpp::cPacket
   protected:
     int JobId;
     int SourceId;
-    int ExecId;
+    int OriginalExecId;
+    int ActualExecId;
     ::omnetpp::simtime_t ResidualTime;
     bool HasEnded;
 
@@ -61,8 +66,10 @@ class msg_check : public ::omnetpp::cPacket
     virtual void setJobId(int JobId);
     virtual int getSourceId() const;
     virtual void setSourceId(int SourceId);
-    virtual int getExecId() const;
-    virtual void setExecId(int ExecId);
+    virtual int getOriginalExecId() const;
+    virtual void setOriginalExecId(int OriginalExecId);
+    virtual int getActualExecId() const;
+    virtual void setActualExecId(int ActualExecId);
     virtual ::omnetpp::simtime_t getResidualTime() const;
     virtual void setResidualTime(::omnetpp::simtime_t ResidualTime);
     virtual bool getHasEnded() const;

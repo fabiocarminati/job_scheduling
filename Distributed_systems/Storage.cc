@@ -2,32 +2,50 @@
 #include <omnetpp.h>
 #include <msg_check_m.h>  //fare parsing
 //#include <msg_backup_m.h>
+#include <map>
+//#include <iostream>
+#define SIZE 1000000
+
+struct msg_info{
+    int job_id,source_id,actual_exec,original_exec;
+    bool ended;
+    //simtime_t residual_time;
+
+};
+
 using namespace omnetpp;
-class Queue : public cSimpleModule {
+class Storage : public cSimpleModule {
 private:
-    msg_check *msgServiced; // message being served
-    msg_check *endServiceMsg;
-    msg_check *send_backup;
-    simtime_t defServiceTime;
-    simtime_t expPar;
-    int src_id,E,N,port_id;
-    double job_id;
+    //msg_check *msgCopy; // send message copy in case of failure
+    msg_check *saveMsg;
+   // msg_backup *storedMsg;
+    msg_info coming_msg;
+
+    std::map<int,msg_info> storedMsg;
+    //map<int,int,int,int,int,simtime_t,bool> storedMsg;
+    //std::map<int,int,int,int,int,simtime_t,bool> storedMsg;  //key is an int type, the value referenced by the key is a msg_backup message
+    std::map<int,msg_info>::iterator search;  //INIZIALIZZARLo!!!!
+    simtime_t expPar,residual_time;
+    int E,job_id,source_id,actual_exec,original_exec;
+    double occupation;
+    bool ended;
+
+
+
 protected:
-    cQueue queue;
     virtual void initialize() override;
     virtual void handleMessage(cMessage *msg) override;
 };
-Define_Module(Queue);
+Define_Module(Storage);
 
-void Queue::initialize() {
-    int i;
+void Storage::initialize() {
+    occupation=0;
+    //storedMsg=new msg_backup[SIZE];
     E = par("E"); //non volatile parameters --once defined they never change
-    N= par("N");
  // The exponential value is computed in the handleMessage; Set the service time as exponential
-    expPar=exponential(par("defServiceTime").doubleValue());
-    msgServiced = endServiceMsg = nullptr;
-   // send_backup = nullptr;
-    endServiceMsg = new msg_check("end-service");
+    //expPar=exponential(par("defServiceTime").doubleValue());
+    //msgServiced = endServiceMsg = nullptr;
+    //endServiceMsg = new msg_check("end-service");
    // for(i=0; i<E; i++){
       //  qname="executor_id=";
      //   qname.append(std::to_string(i).c_str());
@@ -49,21 +67,47 @@ void Queue::initialize() {
        // avgQueueLengthSignals[i] = avgQueueLengthSignal;
     //}
 }
-void Queue::handleMessage(cMessage *cmsg) {
+void Storage::handleMessage(cMessage *cmsg) {
     // Casting from cMessage to msg_check
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
-   if (msg == endServiceMsg){      // SELF-MESSAGE HAS ARRIVED - the server finished serving a message
-      // Get the source_id of the message that just finished service
+   coming_msg.job_id=msg->getJobId();
+   coming_msg.source_id=msg->getSourceId();
+   coming_msg.actual_exec=msg->getActualExecId();
+   coming_msg.original_exec=msg->getOriginalExecId();
+   //residual_time=msg->getResidualTime();
+   coming_msg.ended=msg->getHasEnded();
+  // int,int,int,int,int,simtime_t,bool
+   //for(i=0;i<occupation;i++){
+   //auto search=storedMsg.find(job_id);
+   search=storedMsg.find(job_id);
+   if (search != storedMsg.end()){ //a key is found(the msg has already been inserted in the storage)
+   //if(job_id==i->getJobId){
+       storedMsg.erase(job_id);
+       if(ended==false){
+           storedMsg.insert({job_id,coming_msg});
+           //storedMsg.insert({job_id,source_id,actual_exec,original_exec,residual_time,ended});
+           //load balancing performed
+           //storedMsg.insert( std::array<int,int,int,int,int,simtime_t,bool>(job_id,source_id,actual_exec,original,exec,residual_time,ended));
+           //storedMsg.at(job_id)=msg; //replace the message(basically update actual exec)
+           }
+
+       }
+   else{
+       storedMsg.insert({job_id,coming_msg});
+       //storedMsg.insert( std::array<int,int,int,int,int,simtime_t,bool>(job_id,source_id,actual_exec,original,exec,residual_time,ended));
+       //storedMsg.insert(struct<int,msg_backup> (job_id,msg)); //wrong syntax
+       //storedMsg.insert( std::pair<int,msg_backup>(job_id,msg) );
+       }
+   /*
       job_id= msgServiced->getJobId();
       src_id=msgServiced->getSourceId();
       port_id=src_id-1;
-      msg_check *msg = check_and_cast<msg_check *>(cmsg);
       EV<<"Completed service of "<<job_id<<" coming from user ID "<<src_id<<endl;
       msgServiced->setHasEnded(true);
       // Notify the end of the computation to the input user
       send(msgServiced, "exec$o",port_id);//is it correct id as output? think about it;---thinks about :end of computing+element in the queue:msgserviced=msgfrom the queue
       if(queue.isEmpty()){
-         EV<<"Empty queue, the machine "<<msgServiced->getOriginalExecId()<<" goes IDLE"<<endl;
+         EV<<"Empty queue, the machine "<<msgServiced->getExecId()<<" goes IDLE"<<endl;
          msgServiced = nullptr;
         //emit(busySignal, false);    // Magari puo servire
          }
@@ -74,7 +118,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                   msgServiced->setResidualTime(expPar);  //attenzione che e volatile magari in schedule at e ricalcolato con un diverso valore
                   job_id= msgServiced->getJobId();
                   src_id=msgServiced->getSourceId();
-                  EV<<"Starting service of "<<job_id<<" coming from user ID "<<src_id<<" from the queue of the machine "<<msgServiced->getOriginalExecId()<<endl;
+                  EV<<"Starting service of "<<job_id<<" coming from user ID "<<src_id<<" from the queue of the machine "<<msgServiced->getExecId()<<endl;
                   //serviceTime = exponential(expPar); //defines the service time
                   scheduleAt(simTime()+expPar, endServiceMsg);
                   //EV<<"serviceTime= "<<expPar<<endl;
@@ -82,16 +126,7 @@ void Queue::handleMessage(cMessage *cmsg) {
        }
 
    else{
-       //msg_backup *send_backup = check_and_cast<msg_backup *>(cmsg);
-      send_backup=msg;
-       /*send_backup->setJobId(msg->getJobId());
-       send_backup->setSourceId(msg->getSourceId());
-       send_backup->setActualExecId(msg->getExecId());
-       send_backup->setExecId(msg->getExecId());
-       send_backup->setResidualTime(expPar);
-       send_backup->setHasEnded(false);
-       */
-       send(send_backup,"backup_send$o");//send a copy of backup to the storage to cope with possible failures
+       send(msg,"backup_send$o");//send a copy of backup to the storage to cope with possible failures
        if (!msgServiced){      // Server is IDLE, there's no message in service:execute the one that has arrived right now or put it in the queue
            EV<<"EMPTY queue immediate service "<<endl;
            // Direct service
@@ -107,7 +142,7 @@ void Queue::handleMessage(cMessage *cmsg) {
            }
            else{
                queue.insert(msg);  //ovviamente non ce load balncing tra le varie machine ancora
-               EV<<"QUEUE msg ID "<<job_id<<" coming from user ID "<<src_id<<" goes in the queue of the machine ID"<<msg->getOriginalExecId()<<endl;
+               EV<<"QUEUE msg ID "<<job_id<<" coming from user ID "<<src_id<<" goes in the queue of the machine ID"<<msg->getExecId()<<endl;
                }
 
 
@@ -117,6 +152,6 @@ void Queue::handleMessage(cMessage *cmsg) {
      // EV<<"queueingTime = "<<queueingTime<<endl;
        }
 
-
+*/
 
 }
