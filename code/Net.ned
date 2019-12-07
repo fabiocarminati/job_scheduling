@@ -17,7 +17,7 @@ network Net
 
        machine[E]: Queue {
             parameters:
-                @display("p=354,60,c,90");
+                @display("p=354,60,c,90;q");
             gates:
             	exec[N];
             	backup_send;
@@ -29,7 +29,7 @@ network Net
         //}
         backup:Storage{
             parameters:
-                @display("p=150,10,c,90");
+                @display("p=600,80,c,90");
             gates:
             	backup_rec[E];
         

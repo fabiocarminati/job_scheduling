@@ -1,15 +1,18 @@
 #include <string.h>
 #include <omnetpp.h>
 #include <msg_check_m.h>
+#include <map>
+
 //#include <msg_backup_m.h>
 using namespace omnetpp;
 class Source : public cSimpleModule {
 private:
   int id, nbGenMessages,dst,N,E,output;
   msg_check *sendMessageEvent;
+  std::map<const char *,int> workInProgress;
 protected:
   virtual void initialize();
-  virtual void handleMessage(cMessage *msg);
+  virtual void handleMessage(cMessage *cmsg);
 public:
   simtime_t interArrivalTime;
 
@@ -23,6 +26,7 @@ void Source::initialize() {
     scheduleAt(simTime(), sendMessageEvent); //generates the first packet with priority I from that source I
     E = par("E"); //non volatile parameters --once defined they never change
     N= par("N");
+
 
     }
 void Source::handleMessage(cMessage *cmsg) {
@@ -40,7 +44,7 @@ void Source::handleMessage(cMessage *cmsg) {
         message->setHasEnded(false);  //set message priority
         message->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
         //message->setWaitingTime(SIMTIME_ZERO);
-        message->setJobId(nbGenMessages); //will be useful for computing the per class extended service time
+        message->setJobId(0); //will be useful for computing the per class extended service time
         message->setSourceId(id);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
         dst=uniform(N+2,N+E+1);
         //EV<<" dst "<<dst<<endl ;
@@ -52,11 +56,17 @@ void Source::handleMessage(cMessage *cmsg) {
         scheduleAt(simTime()+interArrivalTime, sendMessageEvent);  //self call that the i-th source makes to generate a new packet with the same priority of the previous ones
 
     }
-    else{ //end of processing
-        EV<<"end of computation "<<msg->getHasEnded()<<endl;
+    else{
+        if(msg->getHasEnded()==true){//end of processing
+            EV<<"end of computation "<<msg->getJobId()<<endl;
+            delete msg;
+            }
 
-        }
-
+        else{ //notify to the user the jobid
+            workInProgress.insert({msg->getJobId(),msg->getOriginalExecId()});
+            EV<<"As a user "<<id<<" "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
+            }
+    }
 
     //else if (end of processing)... else if(msg=controllo a che punto sono).... lo faro dopo
 }

@@ -1,6 +1,6 @@
 packet msg_check //name of the new type of message 
 {
-    int JobId;
+    string JobId;
     int SourceId;
     int OriginalExecId;
     int ActualExecId;

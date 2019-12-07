@@ -23,7 +23,7 @@
  * <pre>
  * packet msg_check //name of the new type of message 
  * {
- *     int JobId;
+ *     string JobId;
  *     int SourceId;
  *     int OriginalExecId;
  *     int ActualExecId;
@@ -38,7 +38,7 @@
 class msg_check : public ::omnetpp::cPacket
 {
   protected:
-    int JobId;
+    ::omnetpp::opp_string JobId;
     int SourceId;
     int OriginalExecId;
     int ActualExecId;
@@ -62,8 +62,8 @@ class msg_check : public ::omnetpp::cPacket
     virtual void parsimUnpack(omnetpp::cCommBuffer *b) override;
 
     // field getter/setter methods
-    virtual int getJobId() const;
-    virtual void setJobId(int JobId);
+    virtual const char * getJobId() const;
+    virtual void setJobId(const char * JobId);
     virtual int getSourceId() const;
     virtual void setSourceId(int SourceId);
     virtual int getOriginalExecId() const;

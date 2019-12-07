@@ -7,7 +7,8 @@
 #define SIZE 1000000
 
 struct msg_info{
-    int job_id,source_id,actual_exec,original_exec;
+    int source_id,actual_exec,original_exec;
+    const char * job_id;
     bool ended;
     //simtime_t residual_time;
 
@@ -21,12 +22,13 @@ private:
    // msg_backup *storedMsg;
     msg_info coming_msg;
 
-    std::map<int,msg_info> storedMsg;
+    std::map<const char *,msg_info> storedMsg;
     //map<int,int,int,int,int,simtime_t,bool> storedMsg;
     //std::map<int,int,int,int,int,simtime_t,bool> storedMsg;  //key is an int type, the value referenced by the key is a msg_backup message
-    std::map<int,msg_info>::iterator search;  //INIZIALIZZARLo!!!!
+    std::map<const char *,msg_info>::iterator search;  //INIZIALIZZARLo!!!!
     simtime_t expPar,residual_time;
-    int E,job_id,source_id,actual_exec,original_exec;
+    int E;
+    //job_id,source_id,actual_exec,original_exec;
     double occupation;
     bool ended;
 
@@ -34,7 +36,7 @@ private:
 
 protected:
     virtual void initialize() override;
-    virtual void handleMessage(cMessage *msg) override;
+    virtual void handleMessage(cMessage *cmsg) override;
 };
 Define_Module(Storage);
 
@@ -79,12 +81,13 @@ void Storage::handleMessage(cMessage *cmsg) {
   // int,int,int,int,int,simtime_t,bool
    //for(i=0;i<occupation;i++){
    //auto search=storedMsg.find(job_id);
-   search=storedMsg.find(job_id);
+   search=storedMsg.find(coming_msg.job_id);
    if (search != storedMsg.end()){ //a key is found(the msg has already been inserted in the storage)
    //if(job_id==i->getJobId){
-       storedMsg.erase(job_id);
+       storedMsg.erase(coming_msg.job_id);
        if(ended==false){
-           storedMsg.insert({job_id,coming_msg});
+           storedMsg.insert({coming_msg.job_id,coming_msg});
+           EV<<"Due to load balancing a change in the machine is performed for "<<coming_msg.job_id<< " and this is notified to the secure storage "<<endl;
            //storedMsg.insert({job_id,source_id,actual_exec,original_exec,residual_time,ended});
            //load balancing performed
            //storedMsg.insert( std::array<int,int,int,int,int,simtime_t,bool>(job_id,source_id,actual_exec,original,exec,residual_time,ended));
@@ -93,7 +96,9 @@ void Storage::handleMessage(cMessage *cmsg) {
 
        }
    else{
-       storedMsg.insert({job_id,coming_msg});
+       storedMsg.insert({coming_msg.job_id,coming_msg});
+       EV<<"New element with ID "<<coming_msg.job_id<< " added in the secure storage "<<endl;
+
        //storedMsg.insert( std::array<int,int,int,int,int,simtime_t,bool>(job_id,source_id,actual_exec,original,exec,residual_time,ended));
        //storedMsg.insert(struct<int,msg_backup> (job_id,msg)); //wrong syntax
        //storedMsg.insert( std::pair<int,msg_backup>(job_id,msg) );
@@ -153,5 +158,5 @@ void Storage::handleMessage(cMessage *cmsg) {
        }
 
 */
-
+   delete msg;
 }

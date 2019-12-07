@@ -181,7 +181,6 @@ Register_Class(msg_check)
 
 msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kind)
 {
-    this->JobId = 0;
     this->SourceId = 0;
     this->OriginalExecId = 0;
     this->ActualExecId = 0;
@@ -238,12 +237,12 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->HasEnded);
 }
 
-int msg_check::getJobId() const
+const char * msg_check::getJobId() const
 {
-    return this->JobId;
+    return this->JobId.c_str();
 }
 
-void msg_check::setJobId(int JobId)
+void msg_check::setJobId(const char * JobId)
 {
     this->JobId = JobId;
 }
@@ -426,7 +425,7 @@ const char *msg_checkDescriptor::getFieldTypeString(int field) const
         field -= basedesc->getFieldCount();
     }
     static const char *fieldTypeStrings[] = {
-        "int",
+        "string",
         "int",
         "int",
         "int",
@@ -500,7 +499,7 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
     }
     msg_check *pp = (msg_check *)object; (void)pp;
     switch (field) {
-        case 0: return long2string(pp->getJobId());
+        case 0: return oppstring2string(pp->getJobId());
         case 1: return long2string(pp->getSourceId());
         case 2: return long2string(pp->getOriginalExecId());
         case 3: return long2string(pp->getActualExecId());
@@ -520,7 +519,7 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
     }
     msg_check *pp = (msg_check *)object; (void)pp;
     switch (field) {
-        case 0: pp->setJobId(string2long(value)); return true;
+        case 0: pp->setJobId((value)); return true;
         case 1: pp->setSourceId(string2long(value)); return true;
         case 2: pp->setOriginalExecId(string2long(value)); return true;
         case 3: pp->setActualExecId(string2long(value)); return true;

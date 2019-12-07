@@ -1,63 +1,54 @@
 #include <string.h>
 #include <omnetpp.h>
 #include <msg_check_m.h>  //fare parsing
-//#include <msg_backup_m.h>
+#include <map>
 using namespace omnetpp;
 class Queue : public cSimpleModule {
 private:
     msg_check *msgServiced; // message being served
     msg_check *endServiceMsg;
-    msg_check *send_backup;
+    msg_check *forward_backup;
+    msg_check *forward_id;
     simtime_t defServiceTime;
     simtime_t expPar;
-    int src_id,E,N,port_id;
-    double job_id;
+    int src_id,E,N,port_id,nReceived;
+
+
 protected:
     cQueue queue;
     virtual void initialize() override;
-    virtual void handleMessage(cMessage *msg) override;
+    virtual void handleMessage(cMessage *cmsg) override;
 };
 Define_Module(Queue);
 
 void Queue::initialize() {
-    int i;
+
+    nReceived=0;
     E = par("E"); //non volatile parameters --once defined they never change
     N= par("N");
  // The exponential value is computed in the handleMessage; Set the service time as exponential
     expPar=exponential(par("defServiceTime").doubleValue());
     msgServiced = endServiceMsg = nullptr;
-   // send_backup = nullptr;
+    forward_backup = forward_id = nullptr;
     endServiceMsg = new msg_check("end-service");
-   // for(i=0; i<E; i++){
-      //  qname="executor_id=";
-     //   qname.append(std::to_string(i).c_str());
-   //     queue[i].setName(std::to_string(i).c_str());
-//
+    forward_backup = new msg_check("sending the message for backup");
+    forward_id = new msg_check("notify the user about job id");
 
 
-
-        // Average (single) queue length
-        // Save the name of the i-th signal in the array of avg queue lengths
-        //sprintf(avgQueueLength, "avgQueueLength%d", i);
-        // Register the signal with the name set above
-        //simsignal_t avgQueueLengthSignal = registerSignal(avgQueueLength);
-        // Save the relative template properties into *statisticTemplate
-       // cProperty *statisticTemplateAQL = getProperties()->get("statisticTemplate", "avgQueueLengthTemplate");
-        // Adds result recording listeners for the given signal on the given component (see addResultRecorders())
-       // getEnvir()->addResultRecorders(this, avgQueueLengthSignal, avgQueueLength,  statisticTemplateAQL);
-        // Assign the signal to the i-th cell of the vector of corresponding signals
-       // avgQueueLengthSignals[i] = avgQueueLengthSignal;
-    //}
 }
 void Queue::handleMessage(cMessage *cmsg) {
     // Casting from cMessage to msg_check
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
+   std::string jobb_id;
+   std::string received;
+   const char * id,* job_id;
+   int machine;
    if (msg == endServiceMsg){      // SELF-MESSAGE HAS ARRIVED - the server finished serving a message
       // Get the source_id of the message that just finished service
       job_id= msgServiced->getJobId();
       src_id=msgServiced->getSourceId();
       port_id=src_id-1;
-      msg_check *msg = check_and_cast<msg_check *>(cmsg);
+
       EV<<"Completed service of "<<job_id<<" coming from user ID "<<src_id<<endl;
       msgServiced->setHasEnded(true);
       // Notify the end of the computation to the input user
@@ -68,9 +59,9 @@ void Queue::handleMessage(cMessage *cmsg) {
         //emit(busySignal, false);    // Magari puo servire
          }
               else{ // at least one queue contains users
-                  // i has the value of the highest priority
+
                   msgServiced = (msg_check *)queue.pop(); //remove the first element of that queue(FIFO policy)
-                  //workDone = msgServiced->getAlreadyDone(); //recover the partial service time execution previously done
+
                   msgServiced->setResidualTime(expPar);  //attenzione che e volatile magari in schedule at e ricalcolato con un diverso valore
                   job_id= msgServiced->getJobId();
                   src_id=msgServiced->getSourceId();
@@ -80,42 +71,45 @@ void Queue::handleMessage(cMessage *cmsg) {
                   //EV<<"serviceTime= "<<expPar<<endl;
               }
        }
-
    else{
-       //msg_backup *send_backup = check_and_cast<msg_backup *>(cmsg);
-      send_backup=msg;
-       /*send_backup->setJobId(msg->getJobId());
-       send_backup->setSourceId(msg->getSourceId());
-       send_backup->setActualExecId(msg->getExecId());
-       send_backup->setExecId(msg->getExecId());
-       send_backup->setResidualTime(expPar);
-       send_backup->setHasEnded(false);
-       */
-       send(send_backup,"backup_send$o");//send a copy of backup to the storage to cope with possible failures
+       nReceived++;
+       machine=msg->getOriginalExecId();
+       jobb_id="Job ID: ";
+       jobb_id.append(std::to_string(machine).c_str());
+       received="-";
+       jobb_id.append(received);
+       jobb_id.append(std::to_string(nReceived).c_str());
+       id=jobb_id.c_str();
+       msg->setJobId(id);
+       forward_backup=msg->dup();
+       port_id=msg->getSourceId()-1;
+       send(forward_backup,"exec$o",port_id);
+       forward_id=msg->dup();
+       send(forward_id,"backup_send$o");//send a copy of backup to the storage to cope with possible failures
+
+       //forward_id = nullptr;
+     //  forward_backup = nullptr;
+
        if (!msgServiced){      // Server is IDLE, there's no message in service:execute the one that has arrived right now or put it in the queue
            EV<<"EMPTY queue immediate service "<<endl;
            // Direct service
            msgServiced = msg; //given that the server is idle the arrived message is immediately served despite his priority
            msgServiced->setResidualTime(expPar);
            // save the time when the packet has been served for the first time (useful for per class extended service time)
-           job_id= msgServiced->getJobId();
            src_id=msgServiced->getSourceId();
-           EV<<"Starting service of "<<job_id<<" coming from user ID "<<src_id<<endl;
+           EV<<"Starting service of "<<id<<" coming from user ID "<<src_id<<endl;
            //serviceTime = exponential(expPar); //defines the service time
            scheduleAt(simTime()+expPar, endServiceMsg);
            //EV<<"serviceTime= "<<expPar<<endl;
            }
            else{
-               queue.insert(msg);  //ovviamente non ce load balncing tra le varie machine ancora
-               EV<<"QUEUE msg ID "<<job_id<<" coming from user ID "<<src_id<<" goes in the queue of the machine ID"<<msg->getOriginalExecId()<<endl;
-               }
+               //ovviamente non ce load balancing tra le varie machine ancora
+               EV<<"QUEUE msg ID "<<id<<" coming from user ID "<<src_id<<" goes in the queue of the machine ID"<<msg->getOriginalExecId()<<endl;
+               queue.insert(msg);
+           }
 
 
-      //queueingTime = msgServiced->getStartingTime() - msgServiced->getTimestamp() - msgServiced->getAlreadyDone();
-     // emit(queueingTimeSignals[priority], queueingTime);
-     // emit(genericQueueingTimeSignal, queueingTime);
-     // EV<<"queueingTime = "<<queueingTime<<endl;
-       }
+   }
 
 
 
