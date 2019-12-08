@@ -12,6 +12,8 @@ private:
     msg_check *probe;
     msg_check *msgToSend;
     msg_check *reply;
+    msg_check *notifyOriginalExec;
+    msg_check *end;
     simtime_t defServiceTime;
     simtime_t expPar;
     int src_id,E,N,port_id,nProcessed,thisLength,minLength;
@@ -37,19 +39,23 @@ void Queue::initialize() {
     N= par("N");
  // The exponential value is computed in the handleMessage; Set the service time as exponential
     expPar=exponential(par("defServiceTime").doubleValue());
-    msgServiced = endServiceMsg = nullptr;
-    forward_backup = forward_id = probe = msgToSend = reply =nullptr;
+    msgServiced = endServiceMsg = end = nullptr;
+    forward_backup = forward_id = probe = msgToSend = reply = notifyOriginalExec =nullptr;
     endServiceMsg = new msg_check("end-service");
     forward_backup = new msg_check("sending the message for backup");
     forward_id = new msg_check("notify the user about job id");
     probe = new msg_check("Ask the load");
     msgToSend = new msg_check("Perform load balancing");
     reply = new msg_check("Reply with a lower queue");
-
+    notifyOriginalExec = new msg_check("Notify original exec about end of the computation");
+    end = new msg_check("Notify to the backup the delete");
 }
 void Queue::handleMessage(cMessage *cmsg) {
     // Casting from cMessage to msg_check
    int i;
+   probe = new msg_check("Ask the load");
+   msgToSend = new msg_check("Perform load balancing");
+   reply = new msg_check("Reply with a lower queue");
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
    std::string jobb_id;
    std::string received;
@@ -63,8 +69,21 @@ void Queue::handleMessage(cMessage *cmsg) {
 
       EV<<"Completed service of "<<job_id<<" coming from user ID "<<src_id<<endl;
       msgServiced->setHasEnded(true);
+
+      if (msgServiced->getReRouted()==true){
+
+          notifyOriginalExec=msgServiced->dup();
+          send(notifyOriginalExec, "load_send",notifyOriginalExec->getOriginalExecId());
+
+      }
+      else{
+          send(msgServiced, "exec$o",port_id);
+          }
+      end=msgServiced->dup();
+      send(end, "backup_send$o");
+
       // Notify the end of the computation to the input user
-      send(msgServiced, "exec$o",port_id);//is it correct id as output? think about it;---thinks about :end of computing+element in the queue:msgserviced=msgfrom the queue
+      //is it correct id as output? think about it;---thinks about :end of computing+element in the queue:msgserviced=msgfrom the queue
       if(queue.isEmpty()){
          EV<<"Empty queue, the machine "<<msgServiced->getOriginalExecId()<<" goes IDLE"<<endl;
          msgServiced = nullptr;
@@ -84,7 +103,11 @@ void Queue::handleMessage(cMessage *cmsg) {
               }
        }
    else{
-       if(msg->getProbing()==false){
+       if(msg->getHasEnded()==true && msg->getReRouted()==true ){
+           ProbeMsg.erase(msg->getJobId());
+           send(msg, "exec$o",msg->getSourceId()-1);
+       }
+       else{ if(msg->getProbing()==false){
            nProcessed++;
            EV<<"new packet event with queue "<<msg->getQueueLength()<<" with original "<<msg->getOriginalExecId()<<" and actual "<<msg->getActualExecId()<<endl;
            if(msg->getReRouted()==false) {
@@ -122,32 +145,32 @@ void Queue::handleMessage(cMessage *cmsg) {
                //EV<<"serviceTime= "<<expPar<<endl;
                }
                else{
-                   if(msg->getQueueLength()!=-1){  //==-1 means that the coming msg has been forwarded by another machine after load balancing
-                       //no need to redo load balancing
                    thisLength++;
+                   if(msg->getReRouted()==false){  //==-1 means that the coming msg has been forwarded by another machine after load balancing
+                       //no need to redo load balancing
                    //ovviamente non ce load balancing tra le varie machine ancora
-                   probe->setHasEnded(false);  //set message priority
-                   probe->setProbing(true);
-                   probe->setProbed(false);
-                   probe->setReRouted(false);
-                   probe->setQueueLength(thisLength);
-                   probe->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
-                   probe->setJobId(msg->getJobId()); //will be useful for computing the per class extended service time
-                   probe->setSourceId(msg->getSourceId());  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
-                   //probe->setActualExecId(msg->getOriginalExecId());
-                   probe->setOriginalExecId(msg->getOriginalExecId());
-                   probe->setActualExecId(msg->getOriginalExecId());
-                   for(i=0;i<E;i++){
-                       if(i!=msg->getOriginalExecId()){
-                           msg_check *query= probe->dup();
-                           query->setActualExecId(i);//attento!
-                           send(query,"load_send",i); //in caso di guasti???
-                           EV<<"Asking the load to machine "<<query->getActualExecId()<<endl;
-                           }
+                       probe->setHasEnded(false);  //set message priority
+                       probe->setProbing(true);
+                       probe->setProbed(false);
+                       probe->setReRouted(false);
+                       probe->setQueueLength(thisLength);
+                       probe->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
+                       probe->setJobId(msg->getJobId()); //will be useful for computing the per class extended service time
+                       probe->setSourceId(msg->getSourceId());  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
+                       //probe->setActualExecId(msg->getOriginalExecId());
+                       probe->setOriginalExecId(msg->getOriginalExecId());
+                       probe->setActualExecId(msg->getOriginalExecId());
+                       for(i=0;i<E;i++){
+                           if(i!=msg->getOriginalExecId()){
+                               msg_check *query= probe->dup();
+                               query->setActualExecId(i);//attento!
+                               send(query,"load_send",i); //in caso di guasti???
+                               EV<<"Asking the load to machine "<<query->getActualExecId()<<endl;
+                               }
                        }
                    //ProbeMsg.insert({msg->getJobId(),probe});
 
-                   //probe = nullptr;
+                   probe = nullptr;
                    }
 
 
@@ -159,10 +182,12 @@ void Queue::handleMessage(cMessage *cmsg) {
                }
        }
        else{
+           EV<<"aaaaa"<<endl;
            if(msg->getProbing()==true && msg->getProbed()==false)  {//sono stato interrogato per sapere lo stato della mia coda---setProbed=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
                if(msg->getQueueLength()>thisLength){   //thisLength+1
                    //NO IS WRONG THIS THINKING+1 is needed in order to avoid ping pong:exe machine 5 has queue length =3 while machine 1 has length  =2... without +1 5-2 and 1-3 but if a
                    //an arrival comes in 3
+                   EV<<"AAAA"<<endl;
                    reply->setProbed(true);
                    reply->setHasEnded(false);  //set message priority
                    reply->setProbing(true);
@@ -176,40 +201,46 @@ void Queue::handleMessage(cMessage *cmsg) {
 
                    send(reply,"load_send",msg->getOriginalExecId());
                    EV<<"The machine "<<msg->getActualExecId()<<" has a lower queue="<<thisLength<<" than the one in machine "<<msg->getOriginalExecId()<<" which has queue length="<<msg->getQueueLength()<<endl;
-
+                   delete msg;
                    }
                else
                    delete msg;
                }
-           minLength=msg->getQueueLength();
-           if(queue.isEmpty()) //maybe in the emantime the queue has been emptied:no need to perform load balancing(also I will try to accesso an empty queue:segmentation fault)
-               delete msg;
            else{
-               search=ProbeMsg.find(msg->getJobId());
-               if (search == ProbeMsg.end()){
-                   msgToSend = (msg_check *)queue.pop();
-                   msgToSend->setHasEnded(false);
-                   msgToSend->setProbing(false);
-                   msgToSend->setProbed(false);
-                   msgToSend->setReRouted(true);
-                   msgToSend->setQueueLength(-1); //modify service time when coming
-                   msgToSend->setActualExecId(msg->getActualExecId());
-                   thisLength--;
-                  // nProcessed--;
-                   ProbeMsg.insert({msg->getJobId(),msgToSend->getActualExecId()});
-                   //msgNotify=msgToSend->dup();
-                   EV<<"Send to the machine "<<msg->getActualExecId()<<" that has a lower queue the "<<msg->getJobId()<<endl;
-                   EV<<"Send  queue "<<msg->getQueueLength()<<endl;
-                   send(msgToSend,"load_send",msg->getActualExecId());//send to the backup
-
-               }
-               else //that message has been already forwarded somewhere:no sense to forward in another place too
+               EV<<"bbbb"<<endl;
+               minLength=msg->getQueueLength();
+               if(queue.isEmpty()) //maybe in the meantime the queue has been emptied:no need to perform load balancing(also I will try to accesso an empty queue:segmentation fault)
                    delete msg;
+               else{
+                   search=ProbeMsg.find(msg->getJobId());
+                   EV<<"cccc"<<endl;
+                   if (search == ProbeMsg.end()){
+                       msgToSend = (msg_check *)queue.pop();
+                       EV<<"dddd"<<endl;
+                       msgToSend->setHasEnded(false);
+                       msgToSend->setProbing(false);
+                       msgToSend->setProbed(false);
+                       msgToSend->setReRouted(true);
+                       msgToSend->setQueueLength(-1); //modify service time when coming
+                       msgToSend->setActualExecId(msg->getActualExecId());
+                       thisLength--;//posso usare queue.getlength
+                      // nProcessed--;
+                       ProbeMsg.insert({msg->getJobId(),msgToSend->getActualExecId()});
+                       //msgNotify=msgToSend->dup();
+                       EV<<"Send to the machine "<<msg->getActualExecId()<<" that has a lower queue the "<<msg->getJobId()<<endl;
+                       EV<<"Send  queue "<<msgToSend->getQueueLength()<<endl;
+                       send(msgToSend,"load_send",msg->getActualExecId());//send to the backup
+                       delete msg;
+                       }
+                   else //that message has been already forwarded somewhere:no sense to forward in another place too
+                       delete msg;
 
+                   }
                }
 
 
 
            }
+       }
    }
 }

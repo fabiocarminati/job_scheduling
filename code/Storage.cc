@@ -79,6 +79,7 @@ void Storage::handleMessage(cMessage *cmsg) {
    //residual_time=msg->getResidualTime();
    coming_msg.ended=msg->getHasEnded();
    coming_msg.rerouted=msg->getReRouted();
+   EV<< coming_msg.rerouted<<endl;
   // int,int,int,int,int,simtime_t,bool
    //for(i=0;i<occupation;i++){
    //auto search=storedMsg.find(job_id);
