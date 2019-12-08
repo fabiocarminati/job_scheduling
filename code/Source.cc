@@ -53,6 +53,8 @@ void Source::handleMessage(cMessage *cmsg) {
         output=dst-N-2;
         message->setActualExecId(output);
         message->setOriginalExecId(output);
+        message->setQueueLength(0);
+        message->setReRouted(false);
         EV<<"destination machine "<<output<<" output port of the user"<<output<<endl;
         send(message,"user$o",output);  //send the message to the queue
         scheduleAt(simTime()+interArrivalTime, sendMessageEvent);  //self call that the i-th source makes to generate a new packet with the same priority of the previous ones

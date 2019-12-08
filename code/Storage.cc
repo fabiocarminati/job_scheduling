@@ -9,7 +9,7 @@
 struct msg_info{
     int source_id,actual_exec,original_exec;
     const char * job_id;
-    bool ended;
+    bool ended,rerouted;
     //simtime_t residual_time;
 
 };
@@ -78,6 +78,7 @@ void Storage::handleMessage(cMessage *cmsg) {
    coming_msg.original_exec=msg->getOriginalExecId();
    //residual_time=msg->getResidualTime();
    coming_msg.ended=msg->getHasEnded();
+   coming_msg.rerouted=msg->getReRouted();
   // int,int,int,int,int,simtime_t,bool
    //for(i=0;i<occupation;i++){
    //auto search=storedMsg.find(job_id);
@@ -85,9 +86,12 @@ void Storage::handleMessage(cMessage *cmsg) {
    if (search != storedMsg.end()){ //a key is found(the msg has already been inserted in the storage)
    //if(job_id==i->getJobId){
        storedMsg.erase(coming_msg.job_id);
-       if(ended==false){
+       EV<<"job id "<<coming_msg.job_id<<endl;
+       if(coming_msg.rerouted==true){
            storedMsg.insert({coming_msg.job_id,coming_msg});
            EV<<"Due to load balancing a change in the machine is performed for "<<coming_msg.job_id<< " and this is notified to the secure storage "<<endl;
+           EV<<"Original  "<<coming_msg.original_exec<<" and new actual "<<coming_msg.actual_exec<<endl;
+
            //storedMsg.insert({job_id,source_id,actual_exec,original_exec,residual_time,ended});
            //load balancing performed
            //storedMsg.insert( std::array<int,int,int,int,int,simtime_t,bool>(job_id,source_id,actual_exec,original,exec,residual_time,ended));

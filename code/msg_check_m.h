@@ -28,10 +28,11 @@
  *     int OriginalExecId;
  *     int ActualExecId;
  *     simtime_t ResidualTime;
- *     bool HasEnded;
  *     int QueueLength;
+ *     bool HasEnded;
  *     bool Probing;
  *     bool Probed;
+ *     bool ReRouted;
  * }
  * 
  * //packet msg_backup extends msg_check //name of the new type of message 
@@ -46,10 +47,11 @@ class msg_check : public ::omnetpp::cPacket
     int OriginalExecId;
     int ActualExecId;
     ::omnetpp::simtime_t ResidualTime;
-    bool HasEnded;
     int QueueLength;
+    bool HasEnded;
     bool Probing;
     bool Probed;
+    bool ReRouted;
 
   private:
     void copy(const msg_check& other);
@@ -78,14 +80,16 @@ class msg_check : public ::omnetpp::cPacket
     virtual void setActualExecId(int ActualExecId);
     virtual ::omnetpp::simtime_t getResidualTime() const;
     virtual void setResidualTime(::omnetpp::simtime_t ResidualTime);
-    virtual bool getHasEnded() const;
-    virtual void setHasEnded(bool HasEnded);
     virtual int getQueueLength() const;
     virtual void setQueueLength(int QueueLength);
+    virtual bool getHasEnded() const;
+    virtual void setHasEnded(bool HasEnded);
     virtual bool getProbing() const;
     virtual void setProbing(bool Probing);
     virtual bool getProbed() const;
     virtual void setProbed(bool Probed);
+    virtual bool getReRouted() const;
+    virtual void setReRouted(bool ReRouted);
 };
 
 inline void doParsimPacking(omnetpp::cCommBuffer *b, const msg_check& obj) {obj.parsimPack(b);}
