@@ -17,10 +17,10 @@ private:
     simtime_t defServiceTime;
     simtime_t expPar;
     int src_id,E,N,port_id,nProcessed,thisLength,minLength;
-    std::map<const char *,int> ProbeMsg;
+    std::map<std::string,int> ProbeMsg;
     //map<int,int,int,int,int,simtime_t,bool> storedMsg;
     //std::map<int,int,int,int,int,simtime_t,bool> storedMsg;  //key is an int type, the value referenced by the key is a msg_backup message
-    std::map<const char *,int>::iterator search;
+    std::map<std::string,int>::iterator search;
 
 
 protected:
@@ -229,7 +229,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                        msgToSend->setActualExecId(msg->getActualExecId());
                        thisLength--;//posso usare queue.getlength
                       // nProcessed--;
-                       ProbeMsg.insert({msg->getJobId(),msgToSend->getActualExecId()});
+                       ProbeMsg.insert(std::pair<std::string, int>(msg->getJobId(),msgToSend->getActualExecId()));
                        //msgNotify=msgToSend->dup();
                        EV<<"Send to the machine "<<msg->getActualExecId()<<" that has a lower queue the "<<msg->getJobId()<<endl;
                        EV<<"Send  queue "<<msgToSend->getQueueLength()<<endl;

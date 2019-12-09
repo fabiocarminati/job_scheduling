@@ -10,7 +10,7 @@ private:
   int id, nbGenMessages,dst,N,E,output;
   msg_check *sendMessageEvent,*timeoutEvent,*msg_to_ack; //posso metterlo nella map???
   simtime_t timeout;
-  std::map<const char *,int> workInProgress;
+  std::map<std::string,int> workInProgress;
 protected:
   virtual void initialize();
   virtual void handleMessage(cMessage *cmsg);
@@ -80,7 +80,7 @@ void Source::handleMessage(cMessage *cmsg) {
                 }
 
             else{ //notify to the user the jobid
-                workInProgress.insert({msg->getJobId(),msg->getOriginalExecId()});
+                workInProgress.insert(std::pair<std::string, int>(msg->getJobId(),msg->getOriginalExecId()));
                 EV << "ACK received for "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
                 cancelEvent(timeoutEvent);
                 interArrivalTime=exponential(par("interArrivalTime").doubleValue());
