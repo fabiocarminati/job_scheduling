@@ -8,7 +8,8 @@ using namespace omnetpp;
 class Source : public cSimpleModule {
 private:
   int id, nbGenMessages,dst,N,E,output;
-  msg_check *sendMessageEvent;
+  msg_check *sendMessageEvent,*timeoutEvent,*msg_to_ack; //posso metterlo nella map???
+  simtime_t timeout;
   std::map<const char *,int> workInProgress;
 protected:
   virtual void initialize();
@@ -26,7 +27,9 @@ void Source::initialize() {
     scheduleAt(simTime(), sendMessageEvent); //generates the first packet with priority I from that source I
     E = par("E"); //non volatile parameters --once defined they never change
     N= par("N");
-
+    timeout=0.5;
+    timeoutEvent = new msg_check("timeoutEvent");
+   // timeoutEvent = msg_to_ack =nullptr;
 
     }
 void Source::handleMessage(cMessage *cmsg) {
@@ -55,24 +58,35 @@ void Source::handleMessage(cMessage *cmsg) {
         message->setOriginalExecId(output);
         message->setQueueLength(0);
         message->setReRouted(false);
-        EV<<"destination machine "<<output<<" output port of the user"<<output<<endl;
+        EV<<"msg sent to machine "<<output<<" with user-output port"<<output<<endl;
+        msg_to_ack=message->dup();
         send(message,"user$o",output);  //send the message to the queue
-        scheduleAt(simTime()+interArrivalTime, sendMessageEvent);  //self call that the i-th source makes to generate a new packet with the same priority of the previous ones
+        scheduleAt(simTime()+timeout, timeoutEvent);//waiting ack
 
     }
     else{
-        if(msg->getHasEnded()==true){//end of processing
-            EV<<"end of computation "<<msg->getJobId()<<endl;
-            workInProgress.erase(msg->getJobId()); //delete the job id
-            delete msg;
+        if (msg==timeoutEvent) {
+            EV << "Timeout expired, resending message and restarting timer\n";
+            send(msg_to_ack,"user$o",msg_to_ack->getOriginalExecId());
+            msg_to_ack=new msg_check("copy");
+            scheduleAt(simTime()+timeout, timeoutEvent);  //self call that the i-th source makes to generate a new packet with the same priority of the previous ones
+
             }
+        else{
+            if(msg->getHasEnded()==true){//end of processing
+                EV<<"end of computation "<<msg->getJobId()<<endl;
+                workInProgress.erase(msg->getJobId()); //delete the job id
+                delete msg;
+                }
 
-        else{ //notify to the user the jobid
-            workInProgress.insert({msg->getJobId(),msg->getOriginalExecId()});
-            EV<<"As a user "<<id<<" "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
-
+            else{ //notify to the user the jobid
+                workInProgress.insert({msg->getJobId(),msg->getOriginalExecId()});
+                EV << "ACK received for "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
+                cancelEvent(timeoutEvent);
+                interArrivalTime=exponential(par("interArrivalTime").doubleValue());
+                scheduleAt(simTime()+interArrivalTime, sendMessageEvent);
+                }
             }
     }
-
     //else if (end of processing)... else if(msg=controllo a che punto sono).... lo faro dopo
 }

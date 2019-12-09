@@ -52,6 +52,7 @@ void Queue::initialize() {
 }
 void Queue::handleMessage(cMessage *cmsg) {
     // Casting from cMessage to msg_check
+
    int i;
    probe = new msg_check("Ask the load");
    msgToSend = new msg_check("Perform load balancing");
@@ -244,3 +245,4 @@ void Queue::handleMessage(cMessage *cmsg) {
        }
    }
 }
+

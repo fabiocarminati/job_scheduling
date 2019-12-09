@@ -83,7 +83,7 @@ void Storage::handleMessage(cMessage *cmsg) {
   // int,int,int,int,int,simtime_t,bool
    //for(i=0;i<occupation;i++){
    //auto search=storedMsg.find(job_id);
-   search=storedMsg.find(coming_msg.job_id);
+   search=storedMsg.find(msg->getJobId());
    if (search != storedMsg.end()){ //a key is found(the msg has already been inserted in the storage)
    //if(job_id==i->getJobId){
        storedMsg.erase(coming_msg.job_id);
