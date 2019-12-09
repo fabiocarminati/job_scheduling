@@ -79,9 +79,9 @@ void Queue::handleMessage(cMessage *cmsg) {
       }
       else{
           send(msgServiced, "exec$o",port_id);
-          }
-      end=msgServiced->dup();
-      send(end, "backup_send$o");
+          end=msgServiced->dup();
+          send(end, "backup_send$o");
+      }
 
       // Notify the end of the computation to the input user
       //is it correct id as output? think about it;---thinks about :end of computing+element in the queue:msgserviced=msgfrom the queue
@@ -106,7 +106,10 @@ void Queue::handleMessage(cMessage *cmsg) {
    else{
        if(msg->getHasEnded()==true && msg->getReRouted()==true ){
            ProbeMsg.erase(msg->getJobId());
+           forward_backup=msg->dup();
            send(msg, "exec$o",msg->getSourceId()-1);
+           forward_backup->setActualExecId(msg->getActualExecId());
+           send(forward_backup,"backup_send$o");
        }
        else{ if(msg->getProbing()==false){
            nProcessed++;
