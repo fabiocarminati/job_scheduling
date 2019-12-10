@@ -5,6 +5,7 @@
 #define SIZE 1000000
 
 using namespace omnetpp;
+
 class Storage : public cSimpleModule {
 private:
 
@@ -16,6 +17,7 @@ protected:
     virtual void initialize() override;
     virtual void handleMessage(cMessage *cmsg) override;
 };
+
 Define_Module(Storage);
 
 void Storage::initialize() {
