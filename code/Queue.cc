@@ -62,9 +62,9 @@ void Queue::handleMessage(cMessage *cmsg) {
     // Casting from cMessage to msg_check
 
    int i;
-   probe = new msg_check("Ask the load");
-   msgToSend = new msg_check("Activate load balancing");
-   reply = new msg_check("Reply with a lower queue");
+   //probe = new msg_check("Ask the load");
+   //msgToSend = new msg_check("Activate load balancing");
+   //reply = new msg_check("Reply with a lower queue");
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
    std::string jobb_id;
    std::string received;
@@ -108,7 +108,7 @@ void Queue::handleMessage(cMessage *cmsg) {
 
        }
        //else //that message has been already forwarded somewhere:no sense to forward in another place too
-   lengths[0]=0;
+       lengths[0]=0;
    }else{
 
 
@@ -128,11 +128,12 @@ void Queue::handleMessage(cMessage *cmsg) {
 
       }
       else{
-          send(msgServiced, "exec$o",port_id);
           end=msgServiced->dup();
           send(end, "backup_send$o");
+          send(msgServiced, "exec$o",port_id); //send(msgServiced->dup(), "exec$o",port_id);
+
       }
-      delete msg;
+       //only msgServiced
       // Notify the end of the computation to the input user
       //is it correct id as output? think about it;---thinks about :end of computing+element in the queue:msgserviced=msgfrom the queue
       if(queue.isEmpty()){
@@ -152,6 +153,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                   scheduleAt(simTime()+expPar, endServiceMsg);
                   //EV<<"serviceTime= "<<expPar<<endl;
               }
+       delete msg;
        }
    else{
        if(msg->getHasEnded()==true && msg->getReRouted()==true ){
@@ -160,8 +162,9 @@ void Queue::handleMessage(cMessage *cmsg) {
            send(msg, "exec$o",msg->getSourceId()-1);
            forward_backup->setActualExecId(msg->getActualExecId());
            send(forward_backup,"backup_send$o");
+
        }
-       else{ if(msg->getProbing()==false){
+       else{ if(msg->getProbing()==false){ //either I receive a new msg from a src or I receive a packet due to load balancing
            nProcessed++;
            EV<<"new packet event with queue "<<msg->getQueueLength()<<" with original "<<msg->getOriginalExecId()<<" and actual "<<msg->getActualExecId()<<endl;
            if(msg->getReRouted()==false) {
@@ -216,24 +219,24 @@ void Queue::handleMessage(cMessage *cmsg) {
                        //probe->setActualExecId(msg->getOriginalExecId());
                        probe->setOriginalExecId(msg->getOriginalExecId());
                        probe->setActualExecId(msg->getOriginalExecId());
-                       for(i=0;i<E-1;i++){
-                           if(i!=msg->getOriginalExecId()){
+                       for(i=1;i<=E;i++){
+                           if(i-1!=msg->getOriginalExecId()){
                                msg_check *query= probe->dup();
-                               query->setActualExecId(i);//attento!
-                               send(query,"load_send",i); //in caso di guasti???
+                               query->setActualExecId(i-1);//attento!
+                               send(query,"load_send",i-1); //in caso di guasti???
                                EV<<"Asking the load to machine "<<query->getActualExecId()<<endl;
-                               lengths[i+1]=-1;
+                               lengths[i]=-1;
                                }
                            //TO DO:ADD ONE TIMEOUT FOR ALL
-                           lengths[0]=1;
-                           lengths[msg->getOriginalExecId()+1]=CLUSTER_SIZE;//OTHERWISE FOR FAULT DETECTION IT'S A MESS
                            }
-                       probe->setActualExecId(E-1);
-                       EV<<"Asking the load to the last machine "<<probe->getActualExecId()<<endl;
-                       send(probe,"load_send",probe->getActualExecId());
+                       lengths[0]=1;
+                       lengths[msg->getOriginalExecId()+1]=CLUSTER_SIZE;//OTHERWISE FOR FAULT DETECTION IT'S A MESS
+                       //probe->setActualExecId(E-1);
+                       //EV<<"Asking the load to the last machine "<<probe->getActualExecId()<<endl;
+                       //send(probe,"load_send",probe->getActualExecId());
                    //ProbeMsg.insert({msg->getJobId(),probe});
                        //delete probe;
-                  // probe = nullptr;
+                       //probe = nullptr;
                        delete msg;
                        scheduleAt(simTime()+timeoutLoad, timeoutEventLoad);
                        }
@@ -263,6 +266,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                reply->setQueueLength(thisLength);
                reply->setActualExecId(msg->getActualExecId());
                send(reply,"load_send",msg->getOriginalExecId());
+
                if(msg->getQueueLength()>thisLength)   //thisLength+1
                    EV<<"The machine "<<msg->getActualExecId()<<" has a lower queue="<<thisLength<<" than the one in machine "<<msg->getOriginalExecId()<<" which has queue length="<<msg->getQueueLength()<<endl;
                else
@@ -271,9 +275,11 @@ void Queue::handleMessage(cMessage *cmsg) {
                delete msg;
                }
            else{
+               if(msg->getProbing()==true && msg->getProbed()==true)  {
                lengths[msg->getActualExecId()+1]=msg->getQueueLength();
                EV<<"store load reply"<<endl;
                delete msg;
+               }
                /*//EV<<"bbbb"<<endl;
                if(queue.isEmpty()) //maybe in the meantime the queue has been emptied:no need to perform load balancing(also I will try to accesso an empty queue:segmentation fault)
                    delete msg;
@@ -283,7 +289,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                    delete msg;
                    }
            */
-           }
+               }
 
 
 
