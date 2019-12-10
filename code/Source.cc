@@ -111,19 +111,20 @@ void Source::handleMessage(cMessage *cmsg) {
                 EV<<"end of computation "<<msg->getJobId()<<endl;
                 //delete the job from the list of the job currently in processing
                 workInProgress.erase(msg->getJobId());
-                delete msg;
                 }
             else{ //received the ack from the executor, the job was received correctly
                 workInProgress.insert(std::pair<std::string, int>(msg->getJobId(),msg->getOriginalExecId()));
                 EV << "ACK received for "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
                 cancelEvent(timeoutEvent);
-                //delete msg;
+                delete msg_to_ack;
                 //simulate an exponential generation of packets
                 interArrivalTime=exponential(par("interArrivalTime").doubleValue());
                 //re-start the timer for new jobs
                 scheduleAt(simTime()+interArrivalTime, sendMessageEvent);
                 }
+
             }
+        delete msg;
     }
     //else if (end of processing)... else if(msg=controllo a che punto sono).... lo faro dopo
 }
