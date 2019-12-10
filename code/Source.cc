@@ -117,6 +117,7 @@ void Source::handleMessage(cMessage *cmsg) {
                 workInProgress.insert(std::pair<std::string, int>(msg->getJobId(),msg->getOriginalExecId()));
                 EV << "ACK received for "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
                 cancelEvent(timeoutEvent);
+                //delete msg;
                 //simulate an exponential generation of packets
                 interArrivalTime=exponential(par("interArrivalTime").doubleValue());
                 //re-start the timer for new jobs
