@@ -1,4 +1,4 @@
-simple Source
+simple Client
 {
     parameters:
         //volatile double pr=default(0);   //col default posso cambiare il parametro durante l'esecuzione

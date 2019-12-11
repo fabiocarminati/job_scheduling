@@ -7,7 +7,7 @@ network Net
         @figure[description](type=text; pos=5,20; font=,,bold; text="Distributed job scheduling");
 
     submodules:
-        gen[N]: Source {
+       	client[N]: Client {
             parameters:
                 @display("p=68,157,c,70");
             gates:
@@ -15,7 +15,7 @@ network Net
 
         }
 
-       machine[E]: Queue {
+       executor[E]: Executor {
             parameters:
                 @display("p=354,60,c,90;q");
             gates:
@@ -38,19 +38,19 @@ network Net
         }
     connections:
 		for i=0..N-1, for j=0..E-1 {
-            // gen[i].out --> queue.in++;
-            gen[i].user[j] <--> machine[j].exec[i];
+            // client[i].out --> queue.in++;
+            client[i].user[j] <--> executor[j].exec[i];
 
         }
         for k=0..E-1 {
-            // gen[i].out --> queue.in++;
-            machine[k].backup_send <--> backup.backup_rec[k];
+            // client[i].out --> queue.in++;
+            executor[k].backup_send <--> backup.backup_rec[k];
 
         }
         for k=0..E-1,for r=0..E-1{
-            // gen[i].out --> queue.in++;
+            // client[i].out --> queue.in++;
 
-            machine[k].load_send[r]-->  machine[r].load_receive[k];
+            executor[k].load_send[r]-->  executor[r].load_receive[k];
 
         }
 

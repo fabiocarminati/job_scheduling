@@ -181,7 +181,7 @@ Register_Class(msg_check)
 
 msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kind)
 {
-    this->SourceId = 0;
+    this->ClientId = 0;
     this->OriginalExecId = 0;
     this->ActualExecId = 0;
     this->ResidualTime = 0;
@@ -212,7 +212,7 @@ msg_check& msg_check::operator=(const msg_check& other)
 void msg_check::copy(const msg_check& other)
 {
     this->JobId = other.JobId;
-    this->SourceId = other.SourceId;
+    this->ClientId = other.ClientId;
     this->OriginalExecId = other.OriginalExecId;
     this->ActualExecId = other.ActualExecId;
     this->ResidualTime = other.ResidualTime;
@@ -227,7 +227,7 @@ void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
 {
     ::omnetpp::cPacket::parsimPack(b);
     doParsimPacking(b,this->JobId);
-    doParsimPacking(b,this->SourceId);
+    doParsimPacking(b,this->ClientId);
     doParsimPacking(b,this->OriginalExecId);
     doParsimPacking(b,this->ActualExecId);
     doParsimPacking(b,this->ResidualTime);
@@ -242,7 +242,7 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
 {
     ::omnetpp::cPacket::parsimUnpack(b);
     doParsimUnpacking(b,this->JobId);
-    doParsimUnpacking(b,this->SourceId);
+    doParsimUnpacking(b,this->ClientId);
     doParsimUnpacking(b,this->OriginalExecId);
     doParsimUnpacking(b,this->ActualExecId);
     doParsimUnpacking(b,this->ResidualTime);
@@ -263,14 +263,14 @@ void msg_check::setJobId(const char * JobId)
     this->JobId = JobId;
 }
 
-int msg_check::getSourceId() const
+int msg_check::getClientId() const
 {
-    return this->SourceId;
+    return this->ClientId;
 }
 
-void msg_check::setSourceId(int SourceId)
+void msg_check::setClientId(int ClientId)
 {
-    this->SourceId = SourceId;
+    this->ClientId = ClientId;
 }
 
 int msg_check::getOriginalExecId() const
@@ -454,7 +454,7 @@ const char *msg_checkDescriptor::getFieldName(int field) const
     }
     static const char *fieldNames[] = {
         "JobId",
-        "SourceId",
+        "ClientId",
         "OriginalExecId",
         "ActualExecId",
         "ResidualTime",
@@ -472,7 +472,7 @@ int msg_checkDescriptor::findField(const char *fieldName) const
     omnetpp::cClassDescriptor *basedesc = getBaseClassDescriptor();
     int base = basedesc ? basedesc->getFieldCount() : 0;
     if (fieldName[0]=='J' && strcmp(fieldName, "JobId")==0) return base+0;
-    if (fieldName[0]=='S' && strcmp(fieldName, "SourceId")==0) return base+1;
+    if (fieldName[0]=='C' && strcmp(fieldName, "ClientId")==0) return base+1;
     if (fieldName[0]=='O' && strcmp(fieldName, "OriginalExecId")==0) return base+2;
     if (fieldName[0]=='A' && strcmp(fieldName, "ActualExecId")==0) return base+3;
     if (fieldName[0]=='R' && strcmp(fieldName, "ResidualTime")==0) return base+4;
@@ -572,7 +572,7 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
     msg_check *pp = (msg_check *)object; (void)pp;
     switch (field) {
         case 0: return oppstring2string(pp->getJobId());
-        case 1: return long2string(pp->getSourceId());
+        case 1: return long2string(pp->getClientId());
         case 2: return long2string(pp->getOriginalExecId());
         case 3: return long2string(pp->getActualExecId());
         case 4: return simtime2string(pp->getResidualTime());
@@ -596,7 +596,7 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
     msg_check *pp = (msg_check *)object; (void)pp;
     switch (field) {
         case 0: pp->setJobId((value)); return true;
-        case 1: pp->setSourceId(string2long(value)); return true;
+        case 1: pp->setClientId(string2long(value)); return true;
         case 2: pp->setOriginalExecId(string2long(value)); return true;
         case 3: pp->setActualExecId(string2long(value)); return true;
         case 4: pp->setResidualTime(string2simtime(value)); return true;

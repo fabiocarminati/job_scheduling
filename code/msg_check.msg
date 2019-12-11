@@ -1,7 +1,7 @@
 packet msg_check //name of the new type of message 
 {
     string JobId;
-    int SourceId;
+    int ClientId;
     int OriginalExecId;
     int ActualExecId;
     simtime_t ResidualTime;

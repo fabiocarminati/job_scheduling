@@ -5,7 +5,7 @@
 #define CLUSTER_SIZE 1000
 #define QUEUE_SIZE 10000000
 using namespace omnetpp;
-class Queue : public cSimpleModule {
+class Executor : public cSimpleModule {
 private:
     msg_check *msgServiced; // message being served
     msg_check *endServiceMsg;
@@ -37,13 +37,13 @@ protected:
     virtual void handleMessage(cMessage *cmsg);// override;
 public:
   simtime_t interArrivalTime;
-  Queue();
-  ~Queue();
+  Executor();
+  ~Executor();
 
 
 };
-Define_Module(Queue);
-Queue::Queue()
+Define_Module(Executor);
+Executor::Executor()
 {
     timeoutEventLoad = msgServiced =endServiceMsg = msgToSend = timeoutReSendOriginal = sentMsg = nullptr;
     forward_backup = forward_id = msgToSend = notifyOriginalExec =nullptr;
@@ -51,7 +51,7 @@ Queue::Queue()
 
 }
 
-Queue::~Queue()
+Executor::~Executor()
 {
     delete msgServiced;
     cancelAndDelete(timeoutEventLoad);
@@ -60,7 +60,7 @@ Queue::~Queue()
     cancelAndDelete(msgToSend);
 }
 
-void Queue::initialize() {
+void Executor::initialize() {
     myId=getId()-2-N;
     nProcessed=0;
     thisLength=0;
@@ -86,7 +86,7 @@ void Queue::initialize() {
     timeoutLoad=0.1;
     timeoutOriginal=0.2;
 }
-void Queue::handleMessage(cMessage *cmsg) {
+void Executor::handleMessage(cMessage *cmsg) {
     // Casting from cMessage to msg_check
 
    int i;
@@ -152,7 +152,7 @@ void Queue::handleMessage(cMessage *cmsg) {
        if (msg == endServiceMsg){      // SELF-MESSAGE HAS ARRIVED - the server finished serving a message
           // Get the source_id of the message that just finished service
           job_id= msgServiced->getJobId();
-          src_id=msgServiced->getSourceId();  //Source id-1=port_id
+          src_id=msgServiced->getClientId();  //Source id-1=port_id
           port_id=src_id-1;
 
           EV<<"Completed service of "<<job_id<<" coming from user ID "<<src_id<<endl;
@@ -185,7 +185,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                       thisLength--;
                       msgServiced->setResidualTime(expPar);  //attenzione che e volatile magari in schedule at e ricalcolato con un diverso valore
                       job_id= msgServiced->getJobId();
-                      src_id=msgServiced->getSourceId();
+                      src_id=msgServiced->getClientId();
                       EV<<"Starting service of "<<job_id<<" coming from user ID "<<src_id<<" from the queue of the machine "<<msgServiced->getOriginalExecId()<<endl;
                       //serviceTime = exponential(expPar); //defines the service time
                       scheduleAt(simTime()+expPar, endServiceMsg);
@@ -200,7 +200,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                forward_backup->setActualExecId(msg->getActualExecId());
                send(forward_backup,"backup_send$o");
                send(msg->dup(),"load_send",msg->getActualExecId());
-               send(msg, "exec$o",msg->getSourceId()-1);
+               send(msg, "exec$o",msg->getClientId()-1);
 
            }
            else {
@@ -223,7 +223,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                    jobb_id.append(std::to_string(nProcessed).c_str());
                    id=jobb_id.c_str();
                    msg->setJobId(id);
-                   port_id=msg->getSourceId()-1;
+                   port_id=msg->getClientId()-1;
                    forward_id=msg->dup();
                    send(forward_id,"exec$o",port_id);
                    EV<<"First time the packet is in the cluster:define his "<<msg->getJobId()<<endl;
@@ -242,7 +242,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                    msgServiced = msg; //given that the server is idle the arrived message is immediately served despite his priority
                    msgServiced->setResidualTime(expPar);
                    // save the time when the packet has been served for the first time (useful for per class extended service time)
-                   src_id=msgServiced->getSourceId();
+                   src_id=msgServiced->getClientId();
                    EV<<"Starting service of "<<msgServiced->getJobId()<<" coming from user ID "<<src_id<<endl;
                    //serviceTime = exponential(expPar); //defines the service time
                    scheduleAt(simTime()+expPar, endServiceMsg);
@@ -262,7 +262,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                            probe->setQueueLength(thisLength);
                            probe->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
                            probe->setJobId(msg->getJobId()); //will be useful for computing the per class extended service time
-                           probe->setSourceId(msg->getSourceId());  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
+                           probe->setClientId(msg->getClientId());  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
                            //probe->setActualExecId(msg->getOriginalExecId());
                            probe->setOriginalExecId(msg->getOriginalExecId());
                            probe->setActualExecId(msg->getOriginalExecId());
@@ -275,7 +275,7 @@ void Queue::handleMessage(cMessage *cmsg) {
 
                            msg->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
                            //msg->setJobId(msg->getJobId()); //will be useful for computing the per class extended service time
-                           //probe->setSourceId(msg->getSourceId());  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
+                           //probe->setClientId(msg->getClientId());  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
                            //probe->setActualExecId(msg->getOriginalExecId());
                            //probe->setOriginalExecId(msg->getOriginalExecId());
                            //probe->setActualExecId(msg->getOriginalExecId());
@@ -323,7 +323,7 @@ void Queue::handleMessage(cMessage *cmsg) {
                    msg->setReRouted(false);
                    msg->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
                   // msg->setJobId(msg->getJobId());
-                   //reply->setSourceId(msg->getSourceId());  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
+                   //reply->setClientId(msg->getClientId());  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
                    //reply->setOriginalExecId(msg->getOriginalExecId());
 
                   // reply->setActualExecId(msg->getActualExecId());

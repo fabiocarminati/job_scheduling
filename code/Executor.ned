@@ -1,4 +1,4 @@
-simple Queue
+simple Executor
 {    
     parameters:
 	//	string schedulingPolicy;

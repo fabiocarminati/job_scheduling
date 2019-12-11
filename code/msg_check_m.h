@@ -24,7 +24,7 @@
  * packet msg_check //name of the new type of message 
  * {
  *     string JobId;
- *     int SourceId;
+ *     int ClientId;
  *     int OriginalExecId;
  *     int ActualExecId;
  *     simtime_t ResidualTime;
@@ -43,7 +43,7 @@ class msg_check : public ::omnetpp::cPacket
 {
   protected:
     ::omnetpp::opp_string JobId;
-    int SourceId;
+    int ClientId;
     int OriginalExecId;
     int ActualExecId;
     ::omnetpp::simtime_t ResidualTime;
@@ -72,8 +72,8 @@ class msg_check : public ::omnetpp::cPacket
     // field getter/setter methods
     virtual const char * getJobId() const;
     virtual void setJobId(const char * JobId);
-    virtual int getSourceId() const;
-    virtual void setSourceId(int SourceId);
+    virtual int getClientId() const;
+    virtual void setClientId(int ClientId);
     virtual int getOriginalExecId() const;
     virtual void setOriginalExecId(int OriginalExecId);
     virtual int getActualExecId() const;

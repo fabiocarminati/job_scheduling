@@ -5,7 +5,7 @@
 
 using namespace omnetpp;
 
-class Source : public cSimpleModule {
+class Client : public cSimpleModule {
 private:
   int sourceID;
   int nbGenMessages;
@@ -22,24 +22,24 @@ protected:
 
 public:
   simtime_t interArrivalTime;
-  Source();
-  ~Source();
+  Client();
+  ~Client();
 };
 
-Define_Module(Source);
+Define_Module(Client);
 
-Source::Source()
+Client::Client()
 {
     timeoutEvent = sendMessageEvent = msg_to_ack = nullptr;
 }
 
-Source::~Source()
+Client::~Client()
 {
     cancelAndDelete(timeoutEvent);
     cancelAndDelete(sendMessageEvent);
 }
 
-void Source::initialize() {
+void Client::initialize() {
     //initializing variables
     sendMessageEvent = new msg_check("sendMessageEvent");
     timeoutEvent = new msg_check("timeoutEvent");
@@ -47,7 +47,7 @@ void Source::initialize() {
     timeout=0.5;
     sourceID=getId()-1;   //defines the Priority-ID of the message that each source will transmit(different sources send different priorities messages)
 
-    EV<<"Source ID "<<sourceID<<endl;
+    EV<<"Client ID "<<sourceID<<endl;
     scheduleAt(simTime(), sendMessageEvent); //generates the first packet
     E = par("E"); //non volatile parameters --once defined they never change
     N= par("N");
@@ -56,7 +56,7 @@ void Source::initialize() {
 
 }
 
-void Source::handleMessage(cMessage *cmsg) {
+void Client::handleMessage(cMessage *cmsg) {
     int destinationPort;
     int destinationMachine;
     msg_check *message;
@@ -79,7 +79,7 @@ void Source::handleMessage(cMessage *cmsg) {
         message->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
         //message->setWaitingTime(SIMTIME_ZERO);
         message->setJobId(0); //will be useful for computing the per class extended service time
-        message->setSourceId(sourceID);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
+        message->setClientId(sourceID);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
         message->setActualExecId(destinationPort);
         message->setOriginalExecId(destinationPort);
         message->setQueueLength(0);
