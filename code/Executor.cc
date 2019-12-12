@@ -21,7 +21,7 @@ private:
     simtime_t timeoutOriginal;
     simtime_t defServiceTime;
     simtime_t expPar;
-    int E,N,nProcessed,thisLength,minLength,lengths[CLUSTER_SIZE],myId;
+    int E,N,nArrived,thisLength,minLength,lengths[CLUSTER_SIZE],myId;
 
     cQueue outgoingPacket;
     std::map<std::string,int> ProbeMsg;
@@ -64,7 +64,7 @@ Executor::~Executor()
 
 void Executor::initialize() {
     myId=getId()-2-N;
-    nProcessed=0;
+    nArrived=0;
     thisLength=0;
     minLength=0;
     E = par("E"); //non volatile parameters --once defined they never change
@@ -111,7 +111,6 @@ void Executor::handleMessage(cMessage *cmsg) {
                  else{
                      //balancedJob(msg, false);
                      balancedJob(msg, true);
-                     EV<<"Reshare the load to "<<endl;
              }
        delete msg;
    }
@@ -123,6 +122,7 @@ void Executor::balancedJob(msg_check *msg, bool update){
     int src_id;
     if(update==true){
         //save the message to the stable storage
+        EV<<"Reshare the load"<<endl;
         EV<<"Send to the backup info about original "<<msg->getOriginalExecId()<<" and actual "<<msg->getActualExecId()<<" of the "<<msg->getJobId()<<endl;
         msgSend = msg->dup();
         msgSend->setActualExecId(msg->getActualExecId());//
@@ -199,19 +199,26 @@ void Executor::probeHandler(msg_check *msg){
     }
 }
 void Executor::ReRoutedJobEnd(msg_check *msg){
-    /*B)When the actual exec receives that ACK:
+    /*When the actual exec receives that ACK:
                ->It will stop the timeout event timeoutReSendOriginal for the ACK
-               ->Delete the local copy of the previously processed packet
+               ->Notify his secure storage to delete the local copy of the previously processed packet
            */
     if(msg->getAck()==true){
       EV << "ACK received from original exec "<<msg->getOriginalExecId() <<" for "<<msg->getJobId()<<endl;
+      ackToActualExec=msg->dup();
+      send(ackToActualExec, "backup_send");
       cancelEvent(timeoutReSendOriginal);
     }
     else{
+        /*When the original exec receives the msg notifying the end of processing by actual exec
+              -> sends the ACK to the actual exec:
+              ->Notify his secure storage to delete the local copy of the previously forwarded packet to the actual exec*/
         EV << "Send the ACK to the actual exec "<<msg->getActualExecId() <<" for "<<msg->getJobId()<<endl;
         ackToActualExec=msg->dup();
         ackToActualExec->setAck(true);
         send(ackToActualExec, "load_send",ackToActualExec->getActualExecId());
+        ackToActualExec=msg->dup();
+        send(ackToActualExec, "backup_send"); //the original exec notifies his own storage to delete the entry
     }
       //delete the copy in the local storage
 }
@@ -221,19 +228,20 @@ void Executor::newJob(msg_check *msg){
     const char *id;
     std::string received;
     int machine, port_id;
-
+    nArrived++;
     //Create the JobId
     machine=msg->getOriginalExecId();
     jobb_id="Job ID: ";
     jobb_id.append(std::to_string(machine));
     received="-";
     jobb_id.append(received);
-    jobb_id.append(std::to_string(nProcessed));
+    jobb_id.append(std::to_string(nArrived));
     id=jobb_id.c_str();
     //save the message to the stable storage
-    EV<<"Send to the backup info about original "<<msg->getOriginalExecId()<<" and actual "<<msg->getActualExecId()<<" of the "<<msg->getJobId()<<endl;
     msgSend=msg->dup();
     msgSend->setActualExecId(msg->getActualExecId());
+    msgSend->setJobId(id);
+    EV<<"Send to the backup info about original "<<msgSend->getOriginalExecId()<<" and actual "<<msgSend->getActualExecId()<<" of the "<<msgSend->getJobId()<<endl;
     send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
     //Reply to the client
     port_id=msg->getClientId()-1;
@@ -241,8 +249,9 @@ void Executor::newJob(msg_check *msg){
     msgSend->setJobId(id);
     msgSend->setAck(true);
     send(msgSend,"exec$o",port_id);
-    EV<<"First time the packet is in the cluster:define his "<<msg->getJobId()<<endl;
+    EV<<"First time the packet is in the cluster:define his "<<msgSend->getJobId()<<endl;
     msg->setNewJob(false);
+    msg->setJobId(id);
     balancedJob(msg,false);
 }
 
@@ -306,11 +315,10 @@ void Executor::selfMessage(msg_check *msg){
                        EV<<"Final executor "<<actualExec<<endl;
                        msgToSend->setActualExecId(actualExec);
                        thisLength--;//posso usare queue.getlength:non sembra funzionare:to do check
-                      // nProcessed--;
+
                        ProbeMsg.insert(std::pair<std::string, int>(msgToSend->getJobId(),msgToSend->getActualExecId())); //will overwrite the existing value?
                        //msgNotify=msgToSend->dup();
                        EV<<"Send to the machine "<<msgToSend->getActualExecId()<<" that has a lower queue the "<<msgToSend->getJobId()<<endl;
-                       EV<<"Send  queue "<<msgToSend->getQueueLength()<<endl;
                        send(msgToSend,"load_send",msgToSend->getActualExecId());//send to the backup
                        //msgToSend=nullptr;
                   }

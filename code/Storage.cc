@@ -38,10 +38,10 @@ void Storage::handleMessage(cMessage *cmsg) {
        delete search->second;
        storedMsg.erase(msg->getJobId());
 
-       EV<<"Job id "<<msg->getJobId()<<endl;
+       EV<<"Erase "<<msg->getJobId()<<"from storage"<<endl;
 
        //if the job has not ended the computation, re-insert it with the modified field
-       if(msg->getReRouted()==true&&msg->getHasEnded()==false){
+       if(msg->getReRouted()==true && msg->getHasEnded()==false){
            storedMsg.insert(std::pair<std::string ,msg_check *>(msg->getJobId(), msg->dup()));
            EV<<"Due to load balancing a change in the machine is performed for "<<msg->getJobId()<< " and this is notified to the secure storage "<<endl;
            EV<<"Original  "<<msg->getOriginalExecId()<<" and new actual "<<msg->getActualExecId()<<endl;
