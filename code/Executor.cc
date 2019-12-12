@@ -135,7 +135,7 @@ void Executor::balancedJob(msg_check *msg, bool update){
        msgServiced = msg->dup(); //given that the server is idle the arrived message is immediately served despite his priority
        msgServiced->setResidualTime(expPar);
        // save the time when the packet has been served for the first time (useful for per class extended service time)
-       EV<<"Starting service of "<<msgServiced->getJobId()<<" coming from user ID "<<src_id<<endl;
+       EV<<"Starting service of "<<msgServiced->getJobId()<<" coming from user ID "<<src_id-1<<endl;
        //serviceTime = exponential(expPar); //defines the service time
        scheduleAt(simTime()+expPar, endServiceMsg);
        //EV<<"serviceTime= "<<expPar<<endl;
@@ -210,15 +210,19 @@ void Executor::ReRoutedJobEnd(msg_check *msg){
       cancelEvent(timeoutReSendOriginal);
     }
     else{
-        /*When the original exec receives the msg notifying the end of processing by actual exec
-              -> sends the ACK to the actual exec:
-              ->Notify his secure storage to delete the local copy of the previously forwarded packet to the actual exec*/
+        /*When the original exec receives the msg notifying the end of processing by actual exec:
+              ->Sends the ACK to the actual exec
+              ->Notifies his secure storage to delete the local copy of the previously forwarded packet to the actual exec
+              ->Notifies the client the end of the processing
+              */
         EV << "Send the ACK to the actual exec "<<msg->getActualExecId() <<" for "<<msg->getJobId()<<endl;
         ackToActualExec=msg->dup();
         ackToActualExec->setAck(true);
         send(ackToActualExec, "load_send",ackToActualExec->getActualExecId());
         ackToActualExec=msg->dup();
         send(ackToActualExec, "backup_send"); //the original exec notifies his own storage to delete the entry
+        ackToActualExec=msg->dup();
+        send(ackToActualExec, "exec$o",msg->getClientId()-1);
     }
       //delete the copy in the local storage
 }
@@ -372,7 +376,7 @@ void Executor::selfMessage(msg_check *msg){
                               msgServiced->setResidualTime(expPar);  //attenzione che e volatile magari in schedule at e ricalcolato con un diverso valore
                               job_id= msgServiced->getJobId();
                               src_id=msgServiced->getClientId();
-                              EV<<"Starting service of "<<job_id<<" coming from user ID "<<src_id<<" from the queue of the machine "<<msgServiced->getOriginalExecId()<<endl;
+                              EV<<"Starting service of "<<job_id<<" coming from user ID "<<src_id-1<<" from the queue of the machine "<<msgServiced->getOriginalExecId()<<endl;
                               //serviceTime = exponential(expPar); //defines the service time
                               scheduleAt(simTime()+expPar, endServiceMsg);
                               //EV<<"serviceTime= "<<expPar<<endl;
