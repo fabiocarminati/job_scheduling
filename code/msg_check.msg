@@ -8,11 +8,7 @@ packet msg_check //name of the new type of message
     int QueueLength;
     bool HasEnded;
     bool Probing;
-    bool Probed;
     bool ReRouted;
+    bool Ack;
+    bool NewJob;
 };
-
-//packet msg_backup extends msg_check //name of the new type of message 
-//{
-   
-//};

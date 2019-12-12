@@ -50,9 +50,7 @@ void Client::initialize() {
     EV<<"Client ID "<<sourceID<<endl;
     scheduleAt(simTime(), sendMessageEvent); //generates the first packet
     E = par("E"); //non volatile parameters --once defined they never change
-    N= par("N");
-
-   // timeoutEvent = msg_to_ack =nullptr;
+    N = par("N");
 
 }
 
@@ -75,7 +73,6 @@ void Client::handleMessage(cMessage *cmsg) {
         message = new msg_check(msgname);
         message->setHasEnded(false);
         message->setProbing(false);
-        message->setProbed(false);
         message->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
         //message->setWaitingTime(SIMTIME_ZERO);
         message->setJobId(0); //will be useful for computing the per class extended service time
@@ -84,6 +81,8 @@ void Client::handleMessage(cMessage *cmsg) {
         message->setOriginalExecId(destinationPort);
         message->setQueueLength(0);
         message->setReRouted(false);
+        message->setAck(false);
+        message->setNewJob(true);
         //simulate an exponential generation of packets
         interArrivalTime=exponential(par("interArrivalTime").doubleValue()); //collect the interarrival time as parameter
 
@@ -113,18 +112,19 @@ void Client::handleMessage(cMessage *cmsg) {
                 workInProgress.erase(msg->getJobId());
                 }
             else{ //received the ack from the executor, the job was received correctly
-                workInProgress.insert(std::pair<std::string, int>(msg->getJobId(),msg->getOriginalExecId()));
-                EV << "ACK received for "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
-                cancelEvent(timeoutEvent);
-                delete msg_to_ack;
-                //simulate an exponential generation of packets
-                interArrivalTime=exponential(par("interArrivalTime").doubleValue());
-                //re-start the timer for new jobs
-                scheduleAt(simTime()+interArrivalTime, sendMessageEvent);
+                 if(msg->getAck()==true){
+                    workInProgress.insert(std::pair<std::string, int>(msg->getJobId(),msg->getOriginalExecId()));
+                    EV << "ACK received for "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
+                    cancelEvent(timeoutEvent);
+                    delete msg_to_ack;
+                    //simulate an exponential generation of packets
+                    interArrivalTime=exponential(par("interArrivalTime").doubleValue());
+                    //re-start the timer for new jobs
+                    scheduleAt(simTime()+interArrivalTime, sendMessageEvent);
                 }
-
             }
-        delete msg;
+            delete msg;
+        }
     }
     //else if (end of processing)... else if(msg=controllo a che punto sono).... lo faro dopo
 }

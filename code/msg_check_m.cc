@@ -188,8 +188,9 @@ msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kin
     this->QueueLength = 0;
     this->HasEnded = false;
     this->Probing = false;
-    this->Probed = false;
     this->ReRouted = false;
+    this->Ack = false;
+    this->NewJob = false;
 }
 
 msg_check::msg_check(const msg_check& other) : ::omnetpp::cPacket(other)
@@ -219,8 +220,9 @@ void msg_check::copy(const msg_check& other)
     this->QueueLength = other.QueueLength;
     this->HasEnded = other.HasEnded;
     this->Probing = other.Probing;
-    this->Probed = other.Probed;
     this->ReRouted = other.ReRouted;
+    this->Ack = other.Ack;
+    this->NewJob = other.NewJob;
 }
 
 void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
@@ -234,8 +236,9 @@ void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
     doParsimPacking(b,this->QueueLength);
     doParsimPacking(b,this->HasEnded);
     doParsimPacking(b,this->Probing);
-    doParsimPacking(b,this->Probed);
     doParsimPacking(b,this->ReRouted);
+    doParsimPacking(b,this->Ack);
+    doParsimPacking(b,this->NewJob);
 }
 
 void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
@@ -249,8 +252,9 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->QueueLength);
     doParsimUnpacking(b,this->HasEnded);
     doParsimUnpacking(b,this->Probing);
-    doParsimUnpacking(b,this->Probed);
     doParsimUnpacking(b,this->ReRouted);
+    doParsimUnpacking(b,this->Ack);
+    doParsimUnpacking(b,this->NewJob);
 }
 
 const char * msg_check::getJobId() const
@@ -333,16 +337,6 @@ void msg_check::setProbing(bool Probing)
     this->Probing = Probing;
 }
 
-bool msg_check::getProbed() const
-{
-    return this->Probed;
-}
-
-void msg_check::setProbed(bool Probed)
-{
-    this->Probed = Probed;
-}
-
 bool msg_check::getReRouted() const
 {
     return this->ReRouted;
@@ -351,6 +345,26 @@ bool msg_check::getReRouted() const
 void msg_check::setReRouted(bool ReRouted)
 {
     this->ReRouted = ReRouted;
+}
+
+bool msg_check::getAck() const
+{
+    return this->Ack;
+}
+
+void msg_check::setAck(bool Ack)
+{
+    this->Ack = Ack;
+}
+
+bool msg_check::getNewJob() const
+{
+    return this->NewJob;
+}
+
+void msg_check::setNewJob(bool NewJob)
+{
+    this->NewJob = NewJob;
 }
 
 class msg_checkDescriptor : public omnetpp::cClassDescriptor
@@ -418,7 +432,7 @@ const char *msg_checkDescriptor::getProperty(const char *propertyname) const
 int msg_checkDescriptor::getFieldCount() const
 {
     omnetpp::cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 10+basedesc->getFieldCount() : 10;
+    return basedesc ? 11+basedesc->getFieldCount() : 11;
 }
 
 unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
@@ -440,8 +454,9 @@ unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISEDITABLE,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<10) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<11) ? fieldTypeFlags[field] : 0;
 }
 
 const char *msg_checkDescriptor::getFieldName(int field) const
@@ -461,10 +476,11 @@ const char *msg_checkDescriptor::getFieldName(int field) const
         "QueueLength",
         "HasEnded",
         "Probing",
-        "Probed",
         "ReRouted",
+        "Ack",
+        "NewJob",
     };
-    return (field>=0 && field<10) ? fieldNames[field] : nullptr;
+    return (field>=0 && field<11) ? fieldNames[field] : nullptr;
 }
 
 int msg_checkDescriptor::findField(const char *fieldName) const
@@ -479,8 +495,9 @@ int msg_checkDescriptor::findField(const char *fieldName) const
     if (fieldName[0]=='Q' && strcmp(fieldName, "QueueLength")==0) return base+5;
     if (fieldName[0]=='H' && strcmp(fieldName, "HasEnded")==0) return base+6;
     if (fieldName[0]=='P' && strcmp(fieldName, "Probing")==0) return base+7;
-    if (fieldName[0]=='P' && strcmp(fieldName, "Probed")==0) return base+8;
-    if (fieldName[0]=='R' && strcmp(fieldName, "ReRouted")==0) return base+9;
+    if (fieldName[0]=='R' && strcmp(fieldName, "ReRouted")==0) return base+8;
+    if (fieldName[0]=='A' && strcmp(fieldName, "Ack")==0) return base+9;
+    if (fieldName[0]=='N' && strcmp(fieldName, "NewJob")==0) return base+10;
     return basedesc ? basedesc->findField(fieldName) : -1;
 }
 
@@ -503,8 +520,9 @@ const char *msg_checkDescriptor::getFieldTypeString(int field) const
         "bool",
         "bool",
         "bool",
+        "bool",
     };
-    return (field>=0 && field<10) ? fieldTypeStrings[field] : nullptr;
+    return (field>=0 && field<11) ? fieldTypeStrings[field] : nullptr;
 }
 
 const char **msg_checkDescriptor::getFieldPropertyNames(int field) const
@@ -579,8 +597,9 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
         case 5: return long2string(pp->getQueueLength());
         case 6: return bool2string(pp->getHasEnded());
         case 7: return bool2string(pp->getProbing());
-        case 8: return bool2string(pp->getProbed());
-        case 9: return bool2string(pp->getReRouted());
+        case 8: return bool2string(pp->getReRouted());
+        case 9: return bool2string(pp->getAck());
+        case 10: return bool2string(pp->getNewJob());
         default: return "";
     }
 }
@@ -603,8 +622,9 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
         case 5: pp->setQueueLength(string2long(value)); return true;
         case 6: pp->setHasEnded(string2bool(value)); return true;
         case 7: pp->setProbing(string2bool(value)); return true;
-        case 8: pp->setProbed(string2bool(value)); return true;
-        case 9: pp->setReRouted(string2bool(value)); return true;
+        case 8: pp->setReRouted(string2bool(value)); return true;
+        case 9: pp->setAck(string2bool(value)); return true;
+        case 10: pp->setNewJob(string2bool(value)); return true;
         default: return false;
     }
 }
