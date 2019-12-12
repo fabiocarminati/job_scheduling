@@ -31,12 +31,10 @@
  *     int QueueLength;
  *     bool HasEnded;
  *     bool Probing;
- *     bool Probed;
  *     bool ReRouted;
+ *     bool Ack;
+ *     bool NewJob;
  * }
- * 
- * //packet msg_backup extends msg_check //name of the new type of message 
- * //{
  * </pre>
  */
 class msg_check : public ::omnetpp::cPacket
@@ -50,8 +48,9 @@ class msg_check : public ::omnetpp::cPacket
     int QueueLength;
     bool HasEnded;
     bool Probing;
-    bool Probed;
     bool ReRouted;
+    bool Ack;
+    bool NewJob;
 
   private:
     void copy(const msg_check& other);
@@ -86,10 +85,12 @@ class msg_check : public ::omnetpp::cPacket
     virtual void setHasEnded(bool HasEnded);
     virtual bool getProbing() const;
     virtual void setProbing(bool Probing);
-    virtual bool getProbed() const;
-    virtual void setProbed(bool Probed);
     virtual bool getReRouted() const;
     virtual void setReRouted(bool ReRouted);
+    virtual bool getAck() const;
+    virtual void setAck(bool Ack);
+    virtual bool getNewJob() const;
+    virtual void setNewJob(bool NewJob);
 };
 
 inline void doParsimPacking(omnetpp::cCommBuffer *b, const msg_check& obj) {obj.parsimPack(b);}

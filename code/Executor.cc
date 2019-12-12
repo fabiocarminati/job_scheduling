@@ -12,6 +12,7 @@ private:
     //msg_check *probe;
     // msg_check *reply;
     msg_check *notifyOriginalExec;
+    msg_check *ackToActualExec;
     msg_check *end;
     msg_check *timeoutEventLoad;
     msg_check *timeoutReSendOriginal;
@@ -30,6 +31,7 @@ private:
     void newJob(msg_check *msg);
     void balancedJob(msg_check *msg, bool update);
     void probeHandler(msg_check *msg);
+    void ReRoutedJobEnd(msg_check *msg);
 protected:
     cQueue queue;
     virtual void initialize();// override;
@@ -45,7 +47,7 @@ public:
 Define_Module(Executor);
 Executor::Executor()
 {
-    timeoutEventLoad = msgServiced = endServiceMsg = timeoutReSendOriginal = sentMsg = nullptr;
+    timeoutEventLoad = msgServiced = endServiceMsg = timeoutReSendOriginal = sentMsg = ackToActualExec = nullptr;
     notifyOriginalExec = nullptr;
     //probe = reply = nullptr;
 
@@ -103,8 +105,14 @@ void Executor::handleMessage(cMessage *cmsg) {
        }else if(msg->getProbing()==true){
                probeHandler(msg);
              }
-       else
-           balancedJob(msg, false);
+             else if(msg->getHasEnded()==true){
+                     ReRoutedJobEnd(msg);
+             }
+                 else{
+                     //balancedJob(msg, false);
+                     balancedJob(msg, true);
+                     EV<<"Reshare the load to "<<endl;
+             }
        delete msg;
    }
 }
@@ -133,8 +141,8 @@ void Executor::balancedJob(msg_check *msg, bool update){
        //EV<<"serviceTime= "<<expPar<<endl;
     }
     else{
-         thisLength++;//se arrivano 2/3 pacchetti insieme la coda aumanta solo di 1 quando chiedo agli altri
-         EV<<"QUEUE msg ID "<<msg->getJobId()<<" coming from user ID "<<src_id<<" goes in the queue of the machine ID"<<msg->getOriginalExecId()<<endl;
+         thisLength++;
+         EV<<"QUEUE msg ID "<<msg->getJobId()<<" coming from user ID "<<src_id<<" goes in the queue of the machine ID"<<msg->getActualExecId()<<endl;
          queue.insert(msg->dup());
          if(msg->getReRouted()==false && lengths[0]==0){  //==-1 means that the coming msg has been forwarded by another machine after load balancing
              msg->setHasEnded(false);  //set message priority
@@ -190,7 +198,23 @@ void Executor::probeHandler(msg_check *msg){
         EV<<"store load reply from "<< msg->getActualExecId()<<endl;
     }
 }
-
+void Executor::ReRoutedJobEnd(msg_check *msg){
+    /*B)When the actual exec receives that ACK:
+               ->It will stop the timeout event timeoutReSendOriginal for the ACK
+               ->Delete the local copy of the previously processed packet
+           */
+    if(msg->getAck()==true){
+      EV << "ACK received from original exec "<<msg->getOriginalExecId() <<" for "<<msg->getJobId()<<endl;
+      cancelEvent(timeoutReSendOriginal);
+    }
+    else{
+        EV << "Send the ACK to the actual exec "<<msg->getActualExecId() <<" for "<<msg->getJobId()<<endl;
+        ackToActualExec=msg->dup();
+        ackToActualExec->setAck(true);
+        send(ackToActualExec, "load_send",ackToActualExec->getActualExecId());
+    }
+      //delete the copy in the local storage
+}
 void Executor::newJob(msg_check *msg){
     msg_check *msgSend;
     std::string jobb_id;
@@ -236,13 +260,18 @@ void Executor::selfMessage(msg_check *msg){
     /* SELF-MESSAGE HAS ARRIVED
     The timeout(timeoutOriginal) started when the actual exec notifies the end of the computation to the original exec has expired:
     1)The actual exec understands that the original exec has crashed/is currently unavailable
-    2)TO DO --- The original executor which hasn't responded is considered as failed and thus the storage is notified
+    2)The actual exec will retry to notify the original exec about the end of the computation starting a new timeout
+    These steps will be repeated by the actual executor until the original exec is available again and thus will reply to the message
     */
 
     if(msg==timeoutReSendOriginal){
-           EV<<"The original executor is not responding;I will notify myself the storage and the user the end of the computation"<<endl;
-           send(sentMsg->dup(), "backup_send$o");
-           send(sentMsg, "exec$o", msgServiced->getClientId()); //send(msgServiced->dup(), "exec$o",port_id);
+
+             EV<<"The original executor is not responding;retry to reach it"<<endl;
+            notifyOriginalExec=sentMsg->dup();
+            send(notifyOriginalExec, "load_send",notifyOriginalExec->getOriginalExecId());
+            //send(sentMsg->dup(), "backup_send$o");
+            scheduleAt(simTime()+timeoutOriginal,timeoutReSendOriginal);
+
        }
        else
            /* SELF-MESSAGE HAS ARRIVED

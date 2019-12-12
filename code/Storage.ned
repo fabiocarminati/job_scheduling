@@ -8,5 +8,5 @@ simple Storage
         int E;
 
     gates:
-        inout backup_rec[];
+        inout backup_rec;
 }

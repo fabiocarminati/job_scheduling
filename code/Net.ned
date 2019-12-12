@@ -29,11 +29,11 @@ network Net
         //    parameters:
         //        @display("p=634,245");
         //}
-        backup:Storage{
+        backup[E]:Storage{
             parameters:
                 @display("p=600,80,c,90");
             gates:
-            	backup_rec[E];
+            	backup_rec;
         
         }
     connections:
@@ -44,7 +44,7 @@ network Net
         }
         for k=0..E-1 {
             // client[i].out --> queue.in++;
-            executor[k].backup_send <--> backup.backup_rec[k];
+            executor[k].backup_send <--> backup[k].backup_rec;
 
         }
         for k=0..E-1,for r=0..E-1{
