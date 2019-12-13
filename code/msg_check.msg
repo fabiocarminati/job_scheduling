@@ -11,4 +11,6 @@ packet msg_check //name of the new type of message
     bool ReRouted;
     bool Ack;
     bool NewJob;
+    bool ReBoot;
+    bool checkPercentageWork;
 };

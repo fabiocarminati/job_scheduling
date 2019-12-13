@@ -83,8 +83,10 @@ void Client::handleMessage(cMessage *cmsg) {
         message->setReRouted(false);
         message->setAck(false);
         message->setNewJob(true);
-        //simulate an exponential generation of packets
-        interArrivalTime=exponential(par("interArrivalTime").doubleValue()); //collect the interarrival time as parameter
+        message->setReBoot(false); //PHIL:questo viene settato come true da un executor dopo aver crashato ed essersi ripreso. In questo
+        //modo quando lo storage vede questo flag a true capisce che deve mandare all'executor tutti i suoi messaggi nella sua map jobQueue(non newJobQueue)
+
+        interArrivalTime=exponential(par("interArrivalTime").doubleValue()); //simulate an exponential generation of packets
 
         EV<<"msg sent to machine "<<destinationMachine<<" with user-output port "<<destinationPort<<endl;
         msg_to_ack=message->dup();
