@@ -14,26 +14,30 @@ private:
     msg_check *notifyOriginalExec;
     msg_check *ackToActualExec;
     msg_check *end;
-    msg_check *timeoutEventLoad;
+    msg_check *timeoutLoadBalancing;
     msg_check *timeoutReSendOriginal;
     msg_check *sentMsg;
     simtime_t timeoutLoad;
     simtime_t timeoutOriginal;
     simtime_t defServiceTime;
     simtime_t expPar;
-    int E,N,nArrived,thisLength,minLength,lengths[CLUSTER_SIZE],myId;
+    int E,N,nArrived,thisLength,myId;
+    bool probingMode;
 
     cQueue outgoingPacket;
+    cQueue newJobsQueue;
+    cQueue jobQueue;
+    cQueue balanceResponses;
     std::map<std::string,int> ProbeMsg;
     std::map<std::string,int>::iterator search;
 
     void selfMessage(msg_check *msg);
     void newJob(msg_check *msg);
-    void balancedJob(msg_check *msg, bool update);
+    void balancedJob(msg_check *msg);
     void probeHandler(msg_check *msg);
     void ReRoutedJobEnd(msg_check *msg);
+    void timeoutLoadBalancingHandler();
 protected:
-    cQueue queue;
     virtual void initialize();// override;
     virtual void handleMessage(cMessage *cmsg);// override;
 
@@ -47,7 +51,7 @@ public:
 Define_Module(Executor);
 Executor::Executor()
 {
-    timeoutEventLoad = msgServiced = endServiceMsg = timeoutReSendOriginal = sentMsg = ackToActualExec = nullptr;
+    timeoutLoadBalancing = msgServiced = endServiceMsg = timeoutReSendOriginal = sentMsg = ackToActualExec = nullptr;
     notifyOriginalExec = nullptr;
     //probe = reply = nullptr;
 
@@ -56,17 +60,16 @@ Executor::Executor()
 Executor::~Executor()
 {
     delete msgServiced;
-    cancelAndDelete(timeoutEventLoad);
+    cancelAndDelete(timeoutLoadBalancing);
     cancelAndDelete(timeoutReSendOriginal);
     cancelAndDelete(endServiceMsg);
    // cancelAndDelete(msgToSend);
 }
 
 void Executor::initialize() {
+    probingMode = false;
     myId=getId()-2-N;
     nArrived=0;
-    thisLength=0;
-    minLength=0;
     E = par("E"); //non volatile parameters --once defined they never change
     N= par("N");
  // The exponential value is computed in the handleMessage; Set the service time as exponential
@@ -80,10 +83,9 @@ void Executor::initialize() {
     //reply = new msg_check("Reply with the queue value");
     notifyOriginalExec = new msg_check("Notify original exec about end of the computation");
     end = new msg_check("Notify to the backup the delete");
-    timeoutEventLoad = new msg_check("timeoutEventLoad");
+    timeoutLoadBalancing = new msg_check("timeoutEventLoad");
     timeoutReSendOriginal = new msg_check("timeoutReSendOriginal");
     sentMsg=new msg_check("sentMsg");
-    lengths[0]=0;
     timeoutLoad=0.1;
     timeoutOriginal=0.2;
 }
@@ -96,7 +98,7 @@ void Executor::handleMessage(cMessage *cmsg) {
    std::string jobb_id;
    std::string received;
    const char * id,* job_id;
-   int machine,minLength;
+   int machine;
    if(msg->isSelfMessage())
       selfMessage(msg);
    else{
@@ -108,26 +110,15 @@ void Executor::handleMessage(cMessage *cmsg) {
              else if(msg->getHasEnded()==true){
                      ReRoutedJobEnd(msg);
              }
-                 else{
-                     //balancedJob(msg, false);
-                     balancedJob(msg, true);
-             }
+
        delete msg;
    }
 }
 
-void Executor::balancedJob(msg_check *msg, bool update){
+void Executor::balancedJob(msg_check *msg){
     msg_check *msgSend;
     int i;
     int src_id;
-    if(update==true){
-        //save the message to the stable storage
-        EV<<"Reshare the load"<<endl;
-        EV<<"Send to the backup info about original "<<msg->getOriginalExecId()<<" and actual "<<msg->getActualExecId()<<" of the "<<msg->getJobId()<<endl;
-        msgSend = msg->dup();
-        msgSend->setActualExecId(msg->getActualExecId());//
-        send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
-    }
     src_id=msg->getClientId();
     if (msgServiced!=nullptr){      // Server is IDLE, there's no message in service:execute the one that has arrived right now or put it in the queue
        EV<<"EMPTY queue immediate service "<<endl;
@@ -141,15 +132,13 @@ void Executor::balancedJob(msg_check *msg, bool update){
        //EV<<"serviceTime= "<<expPar<<endl;
     }
     else{
-         thisLength++;
          EV<<"QUEUE msg ID "<<msg->getJobId()<<" coming from user ID "<<src_id<<" goes in the queue of the machine ID"<<msg->getActualExecId()<<endl;
-         queue.insert(msg->dup());
-         if(msg->getReRouted()==false && lengths[0]==0){  //==-1 means that the coming msg has been forwarded by another machine after load balancing
-             msg->setHasEnded(false);  //set message priority
+         if(!probingMode){  //==-1 means that the coming msg has been forwarded by another machine after load balancing
+             msg->setHasEnded(false);
              msg->setProbing(true);
              msg->setAck(false);
              msg->setReRouted(false);
-             msg->setQueueLength(thisLength);
+             msg->setQueueLength(jobQueue.getLength());
              msg->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
              //msg->setJobId(msg->getJobId()); //will be useful for computing the per class extended service time
              for(i=1;i<=E;i++){
@@ -159,13 +148,11 @@ void Executor::balancedJob(msg_check *msg, bool update){
                      send(msgSend,"load_send",i-1); //in caso di guasti???
                      //EV<<"Queue length"<<query->getQueueLength()<<endl;
                      EV<<"Asking the load to machine "<<msg->getActualExecId()<<endl;
-                     lengths[i]=-1;
                      }
                  //TO DO:ADD ONE TIMEOUT FOR ALL
                  }
-             lengths[0]=1;
-             lengths[msg->getOriginalExecId()+1]=CLUSTER_SIZE;//OTHERWISE FOR FAULT DETECTION IT'S A MESS
-             scheduleAt(simTime()+timeoutLoad, timeoutEventLoad);
+             probingMode = true;
+             scheduleAt(simTime()+timeoutLoad, timeoutLoadBalancing);
          }
     }
 }
@@ -181,10 +168,10 @@ void Executor::probeHandler(msg_check *msg){
         msgSend->setProbing(true);
         msgSend->setReRouted(false);
         msgSend->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
-        if(msgSend->getQueueLength()>thisLength)   //thisLength+1
-            EV<<"The machine "<<msgSend->getActualExecId()<<" has a lower queue="<<thisLength<<" than the one in machine "<<msgSend->getOriginalExecId()<<" which has queue length="<<msgSend->getQueueLength()<<endl;
+        if(msgSend->getQueueLength()>jobQueue.getLength())   //thisLength+1
+            EV<<"The machine "<<msgSend->getQueueLength()<<" has a lower queue="<<thisLength<<" than the one in this machine which has queue length="<<jobQueue.getLength()<<endl;
         else
-            EV<<"The machine "<<msgSend->getActualExecId()<<" has a greater or equal queue="<<thisLength<<" than the one in machine "<<msgSend->getOriginalExecId()<<" which has queue length="<<msgSend->getQueueLength()<<endl;
+            EV<<"The machine "<<msgSend->getQueueLength()<<" has a greater or equal queue="<<thisLength<<" than the one in this machine which has queue length="<<jobQueue.getLength()<<endl;
         msgSend->setQueueLength(thisLength);
         send(msgSend,"load_send",msgSend->getOriginalExecId());
         }
@@ -194,10 +181,11 @@ void Executor::probeHandler(msg_check *msg){
              ->It will extract the QueueLength field of the packet and store it
 
          * */
-        lengths[msg->getActualExecId()+1]=msg->getQueueLength();
+        balanceResponses.insert(msg->dup());
         EV<<"store load reply from "<< msg->getActualExecId()<<endl;
     }
 }
+
 void Executor::ReRoutedJobEnd(msg_check *msg){
     /*When the actual exec receives that ACK:
                ->It will stop the timeout event timeoutReSendOriginal for the ACK
@@ -226,6 +214,7 @@ void Executor::ReRoutedJobEnd(msg_check *msg){
     }
       //delete the copy in the local storage
 }
+
 void Executor::newJob(msg_check *msg){
     msg_check *msgSend;
     std::string jobb_id;
@@ -256,10 +245,50 @@ void Executor::newJob(msg_check *msg){
     EV<<"First time the packet is in the cluster:define his "<<msgSend->getJobId()<<endl;
     msg->setNewJob(false);
     msg->setJobId(id);
-    balancedJob(msg,false);
+    newJobsQueue.insert(msg->dup());
+    balancedJob(msg);
 }
 
+void Executor::timeoutLoadBalancingHandler(){
+    int i;
+    int actualExec;
+    msg_check *tmp;
+    bool processing = true;
 
+    if(balanceResponses.getLength()>0){
+        while(!balanceResponses.isEmpty()){
+          tmp = check_and_cast<msg_check *>(balanceResponses.pop());
+          if(tmp->getQueueLength()<jobQueue.getLength()){
+              actualExec=tmp->getActualExecId();
+              processing = false;
+          }
+          delete tmp;
+        }
+    }
+
+    tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
+    if(processing)
+        jobQueue.insert(tmp);
+    else{
+        tmp->setHasEnded(false);
+        tmp->setProbing(false);
+        tmp->setAck(false);
+        tmp->setReRouted(true);
+        tmp->setQueueLength(-1); //modify service time when coming
+        EV<<"Final executor "<<actualExec<<endl;
+        tmp->setActualExecId(actualExec);
+
+        ProbeMsg.insert(std::pair<std::string, int>(tmp->getJobId(),actualExec)); //will overwrite the existing value?
+        EV<<"Send to the machine "<<actualExec<<" that has a lower queue the "<<tmp->getJobId()<<endl;
+        send(tmp,"load_send", actualExec);//send to the backup
+    }
+    probingMode = false;
+    if(newJobsQueue.getLength()>0){
+        tmp = check_and_cast<msg_check *>(newJobsQueue.front());
+        balancedJob(tmp);
+    }
+    EV<<"queue of jobs "<<jobQueue.getLength()<<endl;
+}
 
 
 
@@ -279,7 +308,7 @@ void Executor::selfMessage(msg_check *msg){
 
     if(msg==timeoutReSendOriginal){
 
-             EV<<"The original executor is not responding;retry to reach it"<<endl;
+            EV<<"The original executor is not responding;retry to reach it"<<endl;
             notifyOriginalExec=sentMsg->dup();
             send(notifyOriginalExec, "load_send",notifyOriginalExec->getOriginalExecId());
             //send(sentMsg->dup(), "backup_send$o");
@@ -294,40 +323,8 @@ void Executor::selfMessage(msg_check *msg){
            2)The responses arrived up to now are checked in order to understand whether load balancing should be performed or not according
             to the different queue length values
            */
-           if(msg==timeoutEventLoad){
-               if(queue.isEmpty()){ //maybe in the meantime the queue has been emptied:no need to perform load balancing(also I will try to accesso an empty queue:segmentation fault)
-                   EV<<"EMPTY queue in the meantime:no load balancing"<<endl;
-               }else{
-                   minLength=thisLength;  //must be put as a constraint for cqueue(I don't want infinite queue)
-                   for(i=1;i<=E;i++){
-                       if(lengths[i]!=-1 && lengths[i]<minLength){
-                           minLength=lengths[i];
-                           actualExec=i-1;
-                           }
-                       }//I suppose that at least one machine(other than the one that has sent the probing msg) is active anytime
-                   if(minLength==thisLength)
-                       EV<<"no one has a lower queue length than me"<<endl;
-                   else{
-                               //search=ProbeMsg.find(msg->getJobId());
-                              // if (search == ProbeMsg.end()){
-                       msgToSend = (msg_check *)queue.pop();
-                       msgToSend->setHasEnded(false);
-                       msgToSend->setProbing(false);
-                       msgToSend->setAck(false);
-                       msgToSend->setReRouted(true);
-                       msgToSend->setQueueLength(-1); //modify service time when coming
-                       EV<<"Final executor "<<actualExec<<endl;
-                       msgToSend->setActualExecId(actualExec);
-                       thisLength--;//posso usare queue.getlength:non sembra funzionare:to do check
-
-                       ProbeMsg.insert(std::pair<std::string, int>(msgToSend->getJobId(),msgToSend->getActualExecId())); //will overwrite the existing value?
-                       //msgNotify=msgToSend->dup();
-                       EV<<"Send to the machine "<<msgToSend->getActualExecId()<<" that has a lower queue the "<<msgToSend->getJobId()<<endl;
-                       send(msgToSend,"load_send",msgToSend->getActualExecId());//send to the backup
-                       //msgToSend=nullptr;
-                  }
-               }
-               lengths[0]=0;
+           if(msg==timeoutLoadBalancing){
+               timeoutLoadBalancingHandler();
            }else
 
            /* SELF-MESSAGE HAS ARRIVED
@@ -366,12 +363,12 @@ void Executor::selfMessage(msg_check *msg){
                        ->If his queue is empty no computation is performed:the executor goes idle until a new packet comes
                        ->If the queue is not empty:takes the first packet in the queue(FIFO approach) and starts to execute it
                    */
-                  if(queue.isEmpty()){
+                  if(newJobsQueue.isEmpty()){
                      EV<<"Empty queue, the machine "<<msgServiced->getOriginalExecId()<<" goes IDLE"<<endl;
                     //emit(busySignal, false);    // Magari puo servire
                      }
                           else{ // at least one queue contains users
-                              msgServiced = (msg_check *)queue.pop(); //remove the first element of that queue(FIFO policy)
+                              //msgServiced = (msg_check *)newJobsQueue.pop(); //remove the first element of that queue(FIFO policy)
                               thisLength--;
                               msgServiced->setResidualTime(expPar);  //attenzione che e volatile magari in schedule at e ricalcolato con un diverso valore
                               job_id= msgServiced->getJobId();
