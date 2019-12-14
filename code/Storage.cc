@@ -16,10 +16,8 @@ private:
     std::map<std::string, msg_check *> jobQueue;
     std::map<std::string, msg_check *>::iterator searchJobQueue;
 
-    msg_check *msgBackup;
-
-    void searchMessage(msg_check *msg,std::map<std::string, msg_check *> storedMap,std::map<std::string, msg_check *>::iterator search);
-    void executorReboot(msg_check *msg,std::map<std::string, msg_check *> storedMap,std::map<std::string, msg_check *>::iterator search);
+    void searchMessage(std::string jobId,  msg_check *msg, std::map<std::string, msg_check *> storedMap,std::map<std::string, msg_check *>::iterator search);
+    void executorReboot(std::string jobId, std::map<std::string, msg_check *> storedMap,std::map<std::string, msg_check *>::iterator search);
 
 
 
@@ -40,8 +38,6 @@ Define_Module(Storage);
 Storage::Storage()
 {
 
-    msgBackup = nullptr;
-
 }
 Storage::~Storage()
 {
@@ -56,59 +52,61 @@ Storage::~Storage()
      ->The map function jobQueue that contains all the messages waiting to be processed by that executor
  */
 void Storage::initialize() {
-    msgBackup = new msg_check("send to the executor the backup copy of the jobs that he has to process");
 
 }
 void Storage::handleMessage(cMessage *cmsg) {
    // Casting from cMessage to msg_check
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
+   std::string jobId;
+
+   jobId.append(std::to_string(msg->getOriginalExecId()));
+   jobId.append("-");
+   jobId.append(std::to_string(msg->getRelativeJobId()));
+
    if(msg->getReBoot()==true)
-       executorReboot(msg,jobQueue,searchJobQueue);
+       executorReboot(jobId,jobQueue,searchJobQueue);
    else{
-       searchMessage(msg,newJobsQueue,searchNewJobsQueue);
-       searchMessage(msg,jobQueue,searchJobQueue);
+       searchMessage(jobId,msg,newJobsQueue,searchNewJobsQueue);
+       searchMessage(jobId,msg,jobQueue,searchJobQueue);
    }
 
    delete msg;
 }
 
-void Storage::executorReboot(msg_check *msg,std::map<std::string, msg_check *> storedMap ,std::map<std::string, msg_check *>::iterator search){
-
-
+void Storage::executorReboot(std::string jobId, std::map<std::string, msg_check *> storedMap ,std::map<std::string, msg_check *>::iterator search){
+    msg_check *msgBackup;
     for (auto search = storedMap.begin();search != storedMap.end(); ++search){
         //EV<<"This is the job id "<<search->first<<endl;
         msgBackup=search->second->dup();
+        msgBackup->setName("send to the executor the backup copy of the jobs that he has to process");
         send(msgBackup,"backup_rec");
-        EV<<"send the backup copy for "<<msgBackup->getJobId()<<endl;
-        //PHIL---maybe we need an ack to check that the executor is still online and so has received each of these messages???
+        EV<<"send the backup copy for "<<jobId<<endl;
     }
-
 }
-void Storage::searchMessage(msg_check *msg,std::map<std::string, msg_check *> storedMap ,std::map<std::string, msg_check *>::iterator search){
-
+void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::string, msg_check *> storedMap ,std::map<std::string, msg_check *>::iterator search){
     //Search if the job is already present
-    search=storedMap.find(msg->getJobId());
+    search=storedMap.find(jobId);
 
     if (search != storedMap.end()){
         //a key is found(the msg has already been inserted in the storage
 
         //Delete the old job entry
         delete search->second;
-        storedMap.erase(msg->getJobId());
+        storedMap.erase(jobId);
 
-        EV<<"Erase "<<msg->getJobId()<<"from storage"<<endl;
+        EV<<"Erase "<<jobId<<"from storage"<<endl;
 
         //if the job has not ended the computation, re-insert it with the modified field
         if(msg->getReRouted()==true && msg->getHasEnded()==false){
-            storedMap.insert(std::pair<std::string ,msg_check *>(msg->getJobId(), msg->dup()));
-            EV<<"Due to load balancing a change in the machine is performed for "<<msg->getJobId()<< " and this is notified to the secure storage "<<endl;
+            storedMap.insert(std::pair<std::string ,msg_check *>(jobId, msg->dup()));
+            EV<<"Due to load balancing a change in the machine is performed for "<<jobId<< " and this is notified to the secure storage "<<endl;
             EV<<"Original  "<<msg->getOriginalExecId()<<" and new actual "<<msg->getActualExecId()<<endl;
         }
     }
     else{
         //No job found, insert it has new job
-        storedMap.insert(std::pair<std::string ,msg_check *>(msg->getJobId(), msg->dup()));
-        EV<<"New element with ID "<<msg->getJobId()<< " added in the secure storage in the map "<<endl;
+        storedMap.insert(std::pair<std::string ,msg_check *>(jobId, msg->dup()));
+        EV<<"New element with ID "<<jobId<< " added in the secure storage in the map "<<endl;
     }
 
 }

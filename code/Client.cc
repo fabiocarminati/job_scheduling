@@ -60,7 +60,11 @@ void Client::handleMessage(cMessage *cmsg) {
     msg_check *message;
     // Casting from cMessage to msg_check
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
+    std::string jobId;
 
+    jobId.append(std::to_string(msg->getOriginalExecId()));
+    jobId.append("-");
+    jobId.append(std::to_string(msg->getRelativeJobId()));
     if (msg == sendMessageEvent){
         char msgname[20];
         ++nbGenMessages; //Total number of packets sent by a specific source(thus with the same priority) up to now
@@ -75,7 +79,7 @@ void Client::handleMessage(cMessage *cmsg) {
         message->setProbing(false);
         message->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
         //message->setWaitingTime(SIMTIME_ZERO);
-        message->setJobId(0); //will be useful for computing the per class extended service time
+        message->setRelativeJobId(0); //will be useful for computing the per class extended service time
         message->setClientId(sourceID);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
         message->setActualExecId(destinationPort);
         message->setOriginalExecId(destinationPort);
@@ -101,22 +105,20 @@ void Client::handleMessage(cMessage *cmsg) {
             EV << "Timeout expired, resending message and restarting timer\n";
 
             send(msg_to_ack->dup(),"user$o",msg_to_ack->getOriginalExecId());
-            // non ho ben capito perchè crei un messaggio cosi, faccio alcune modifiche
-            // se pensi che non vadano benne dimmi pure: msg_to_ack=new msg_check("copy");
             //start the timeout for the re-transmission
             scheduleAt(simTime()+timeout, timeoutEvent);
             }
         else{
             //end of the processing
             if(msg->getHasEnded()==true){
-                EV<<"end of computation "<<msg->getJobId()<<endl;
+                EV<<"end of computation "<<msg->getOriginalExecId()<<"-"<<msg->getRelativeJobId()<<endl;
                 //delete the job from the list of the job currently in processing
-                workInProgress.erase(msg->getJobId());
+                workInProgress.erase(jobId);
                 }
             else{ //received the ack from the executor, the job was received correctly
                  if(msg->getAck()==true){
-                    workInProgress.insert(std::pair<std::string, int>(msg->getJobId(),msg->getOriginalExecId()));
-                    EV << "ACK received for "<<msg->getJobId() <<" from "<<workInProgress.at(msg->getJobId())<<endl;
+                    workInProgress.insert(std::pair<std::string, int>(jobId,msg->getOriginalExecId()));
+                    EV << "ACK received for "<<jobId <<" from "<<workInProgress.at(jobId)<<endl;
                     cancelEvent(timeoutEvent);
                     delete msg_to_ack;
                     //simulate an exponential generation of packets
