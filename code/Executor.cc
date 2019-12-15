@@ -276,21 +276,23 @@ void Executor::newJob(msg_check *msg){
 
 void Executor::timeoutLoadBalancingHandler(){
     int i;
-    int actualExec;
+    int actualExec = -1;
     msg_check *tmp;
     bool processing = true;
+    int minLength = jobQueue.getLength();
     if(balanceResponses.getLength()>0){
+        tmp = check_and_cast<msg_check *>(balanceResponses.front());
+        actualExec = tmp->getOriginalExecId();
         while(!balanceResponses.isEmpty()){
           tmp = check_and_cast<msg_check *>(balanceResponses.pop());
-          actualExec = tmp->getOriginalExecId();
-          if(tmp->getQueueLength()<jobQueue.getLength()){
+          if(tmp->getQueueLength()<minLength){
               actualExec=tmp->getActualExecId();
               processing = false;
+              minLength = tmp->getQueueLength();
           }
           delete tmp;
         }
     }
-
     tmp = check_and_cast<msg_check *>(newJobsQueue.front());
     if(processing){
         tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
