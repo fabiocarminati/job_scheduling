@@ -15,9 +15,8 @@ private:
     msg_check *ackToActualExec;
     msg_check *end;
     msg_check *timeoutLoadBalancing;
-    msg_check *timeoutReRoute;
+    msg_check *timeoutReRouted;
     msg_check *timeoutReSendOriginal;
-    msg_check *sentMsg;
     simtime_t timeoutLoad;
     simtime_t timeoutOriginal;
     simtime_t defServiceTime;
@@ -53,10 +52,8 @@ public:
 Define_Module(Executor);
 Executor::Executor()
 {
-    timeoutLoadBalancing = msgServiced = endServiceMsg = timeoutReSendOriginal = sentMsg = ackToActualExec = nullptr;
-    notifyOriginalExec = nullptr;
-    //probe = reply = nullptr;
-
+    timeoutLoadBalancing = msgServiced = endServiceMsg = timeoutReSendOriginal = ackToActualExec = nullptr;
+    timeoutReRouted = notifyOriginalExec = nullptr;
 }
 
 Executor::~Executor()
@@ -65,7 +62,7 @@ Executor::~Executor()
     cancelAndDelete(timeoutLoadBalancing);
     cancelAndDelete(timeoutReSendOriginal);
     cancelAndDelete(endServiceMsg);
-   // cancelAndDelete(msgToSend);
+    cancelAndDelete(timeoutReRouted);
 }
 
 void Executor::initialize() {
@@ -85,9 +82,9 @@ void Executor::initialize() {
     //reply = new msg_check("Reply with the queue value");
     notifyOriginalExec = new msg_check("Notify original exec about end of the computation");
     end = new msg_check("Notify to the backup the delete");
-    timeoutLoadBalancing = new msg_check("timeoutEventLoad");
+    timeoutLoadBalancing = new msg_check("timeoutLoadBalancing");
     timeoutReSendOriginal = new msg_check("timeoutReSendOriginal");
-    sentMsg=new msg_check("sentMsg");
+    timeoutReRouted = new msg_check("timeoutReRouted");
     timeoutLoad=0.1;
     timeoutOriginal=0.2;
 }
@@ -146,11 +143,11 @@ void Executor::balancedJob(msg_check *msg){
              msg->setQueueLength(jobQueue.getLength());
              msg->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
              //msg->setJobId(msg->getJobId()); //will be useful for computing the per class extended service time
-             for(i=1;i<=E;i++){
-                 if(i-1!=msg->getOriginalExecId()){
-                     msg->setActualExecId(i-1);//attento!
+             for(i=0;i<E;i++){
+                 if(i!=msg->getOriginalExecId()){
+                     msg->setActualExecId(i);//attento!
                      msgSend = msg->dup();
-                     send(msgSend,"load_send",i-1); //in caso di guasti???
+                     send(msgSend,"load_send",i); //in caso di guasti???
                      //EV<<"Queue length"<<query->getQueueLength()<<endl;
                      EV<<"Asking the load to machine "<<msg->getActualExecId()<<endl;
                      }
@@ -202,7 +199,7 @@ void Executor::reRoutedHandler(msg_check *msg){
         send(msgSend,"load_send",msgSend->getOriginalExecId());
         jobQueue.insert(msg->dup());
         EV<<"new job in the queue, actual length: "<< jobQueue.getLength()<<endl;
-        }
+   }
     else{
         msgSend = check_and_cast<msg_check *>(newJobsQueue.pop());
         reRoutedJobs.add(msgSend);
@@ -211,6 +208,7 @@ void Executor::reRoutedHandler(msg_check *msg){
             msgSend = check_and_cast<msg_check *>(newJobsQueue.front());
             balancedJob(msgSend);
         }
+        cancelEvent(timeoutReRouted);
         EV<<"store load reply from "<< msg->getActualExecId()<<endl;
     }
 }
@@ -308,11 +306,12 @@ void Executor::timeoutLoadBalancingHandler(){
         tmp->setProbing(false);
         tmp->setAck(false);
         tmp->setReRouted(true);
-        tmp->setQueueLength(-1); //modify service time when coming
+        tmp->setQueueLength(-1);
         tmp->setActualExecId(actualExec);
 
         EV<<"Send to the machine "<<actualExec<<" that has a lower queue the "<<tmp->getRelativeJobId()<<endl;
-        send(tmp->dup(),"load_send", actualExec);//send to the backup
+        send(tmp->dup(),"load_send", actualExec);
+        scheduleAt(simTime()+timeoutLoad, timeoutReRouted);
     }
     EV<<"Final executor "<<actualExec<<endl;
     EV<<"queue of jobs "<<jobQueue.getLength()<<endl;
@@ -326,7 +325,7 @@ void Executor::selfMessage(msg_check *msg){
     const char * id;
     int jobId;
     int actualExec, src_id, port_id;
-    msg_check *msgToSend = new msg_check("Perform load balancing");
+    msg_check *msgToSend;
     msg_check *msgServiced;
     /* SELF-MESSAGE HAS ARRIVED
     The timeout(timeoutOriginal) started when the actual exec notifies the end of the computation to the original exec has expired:
@@ -338,11 +337,17 @@ void Executor::selfMessage(msg_check *msg){
     if(msg==timeoutReSendOriginal){
 
             EV<<"The original executor is not responding;retry to reach it"<<endl;
-            notifyOriginalExec=sentMsg->dup();
+            //notifyOriginalExec=sentMsg->dup();
             send(notifyOriginalExec, "load_send",notifyOriginalExec->getOriginalExecId());
             //send(sentMsg->dup(), "backup_send$o");
             //scheduleAt(simTime()+timeoutOriginal,timeoutReSendOriginal);
 
+       }
+       if(msg==timeoutReRouted){
+           if(newJobsQueue.getLength()>0){
+               msgToSend = check_and_cast<msg_check *>(newJobsQueue.front());
+               balancedJob(msgToSend);
+           }
        }
        else
            /* SELF-MESSAGE HAS ARRIVED
@@ -379,7 +384,7 @@ void Executor::selfMessage(msg_check *msg){
                   if (msgServiced->getReRouted()==true){
                       notifyOriginalExec=msgServiced->dup();
                       send(notifyOriginalExec, "load_send",notifyOriginalExec->getOriginalExecId());
-                      sentMsg=msgServiced->dup();
+                      //sentMsg=msgServiced->dup();
                       //scheduleAt(simTime()+timeoutOriginal,timeoutReSendOriginal);
                   }
                   else{
