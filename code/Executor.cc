@@ -184,7 +184,7 @@ void Executor::reRoutedHandler(msg_check *msg){
             balancedJob(msgSend);
         }
         cancelEvent(timeoutReRouted);
-        EV<<"store load reply from "<< msg->getActualExecId()<<endl;
+        EV<<"ack received from actual exec "<< msg->getActualExecId()<<endl;
     }
 }
 
@@ -222,6 +222,7 @@ void Executor::newJob(msg_check *msg){
     const char *id;
     std::string jobId;
     int machine, port_id;
+    simtime_t timeoutJobComplexity;
     nArrived++;
     //Create the JobId
     machine=msg->getOriginalExecId();
@@ -244,7 +245,15 @@ void Executor::newJob(msg_check *msg){
     EV<<"First time the packet is in the cluster:define his "<<id<<endl;
     msg->setNewJob(false);
     newJobsQueue.insert(msg->dup());
-    balancedJob(msg);
+
+    if(!jobQueue.getLength()){
+        jobQueue.insert(msg->dup());
+        //if(!timeoutJobComputation->isScheduled())
+        timeoutJobComplexity = msg->getJobComplexity();
+        scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
+    }
+    else
+        balancedJob(msg);
 }
 
 void Executor::timeoutLoadBalancingHandler(){
@@ -318,10 +327,8 @@ void Executor::timeoutJobExecutionHandler(){
       ->If his queue is empty no computation is performed:the executor goes idle until a new packet comes
       ->If the queue is not empty:takes the first packet in the queue(FIFO approach) and starts to execute it
      */
-    if(jobQueue.isEmpty()){
+    if(jobQueue.isEmpty())
       EV<<"Empty queue, the machine "<<msgServiced->getActualExecId()<<" goes IDLE"<<endl;
-      cancelEvent(timeoutLoadBalancing);
-    }
     else{
          msgServiced = check_and_cast<msg_check *>(jobQueue.front());
          originalExecutor = msgServiced->getOriginalExecId();

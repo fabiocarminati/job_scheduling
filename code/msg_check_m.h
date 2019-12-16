@@ -23,11 +23,11 @@
  * <pre>
  * packet msg_check //name of the new type of message 
  * {
- *     string JobId;
+ *     int RelativeJobId;
  *     int ClientId;
  *     int OriginalExecId;
  *     int ActualExecId;
- *     simtime_t ResidualTime;
+ *     simtime_t JobComplexity;
  *     int QueueLength;
  *     bool HasEnded;
  *     bool Probing;
@@ -42,11 +42,11 @@
 class msg_check : public ::omnetpp::cPacket
 {
   protected:
-    ::omnetpp::opp_string JobId;
+    int RelativeJobId;
     int ClientId;
     int OriginalExecId;
     int ActualExecId;
-    ::omnetpp::simtime_t ResidualTime;
+    ::omnetpp::simtime_t JobComplexity;
     int QueueLength;
     bool HasEnded;
     bool Probing;
@@ -73,16 +73,16 @@ class msg_check : public ::omnetpp::cPacket
     virtual void parsimUnpack(omnetpp::cCommBuffer *b) override;
 
     // field getter/setter methods
-    virtual const char * getJobId() const;
-    virtual void setJobId(const char * JobId);
+    virtual int getRelativeJobId() const;
+    virtual void setRelativeJobId(int RelativeJobId);
     virtual int getClientId() const;
     virtual void setClientId(int ClientId);
     virtual int getOriginalExecId() const;
     virtual void setOriginalExecId(int OriginalExecId);
     virtual int getActualExecId() const;
     virtual void setActualExecId(int ActualExecId);
-    virtual ::omnetpp::simtime_t getResidualTime() const;
-    virtual void setResidualTime(::omnetpp::simtime_t ResidualTime);
+    virtual ::omnetpp::simtime_t getJobComplexity() const;
+    virtual void setJobComplexity(::omnetpp::simtime_t JobComplexity);
     virtual int getQueueLength() const;
     virtual void setQueueLength(int QueueLength);
     virtual bool getHasEnded() const;
