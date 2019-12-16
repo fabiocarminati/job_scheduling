@@ -4,7 +4,7 @@ packet msg_check //name of the new type of message
     int ClientId;
     int OriginalExecId;
     int ActualExecId;
-    simtime_t ResidualTime;
+    simtime_t JobComplexity;
     int QueueLength;
     bool HasEnded;
     bool Probing;

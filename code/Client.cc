@@ -77,8 +77,7 @@ void Client::handleMessage(cMessage *cmsg) {
         message = new msg_check(msgname);
         message->setHasEnded(false);
         message->setProbing(false);
-        message->setResidualTime(SIMTIME_ZERO); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
-        //message->setWaitingTime(SIMTIME_ZERO);
+        message->setJobComplexity(0.2); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
         message->setRelativeJobId(0); //will be useful for computing the per class extended service time
         message->setClientId(sourceID);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
         message->setActualExecId(destinationPort);

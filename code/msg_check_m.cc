@@ -185,7 +185,7 @@ msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kin
     this->ClientId = 0;
     this->OriginalExecId = 0;
     this->ActualExecId = 0;
-    this->ResidualTime = 0;
+    this->JobComplexity = 0;
     this->QueueLength = 0;
     this->HasEnded = false;
     this->Probing = false;
@@ -219,7 +219,7 @@ void msg_check::copy(const msg_check& other)
     this->ClientId = other.ClientId;
     this->OriginalExecId = other.OriginalExecId;
     this->ActualExecId = other.ActualExecId;
-    this->ResidualTime = other.ResidualTime;
+    this->JobComplexity = other.JobComplexity;
     this->QueueLength = other.QueueLength;
     this->HasEnded = other.HasEnded;
     this->Probing = other.Probing;
@@ -237,7 +237,7 @@ void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
     doParsimPacking(b,this->ClientId);
     doParsimPacking(b,this->OriginalExecId);
     doParsimPacking(b,this->ActualExecId);
-    doParsimPacking(b,this->ResidualTime);
+    doParsimPacking(b,this->JobComplexity);
     doParsimPacking(b,this->QueueLength);
     doParsimPacking(b,this->HasEnded);
     doParsimPacking(b,this->Probing);
@@ -255,7 +255,7 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->ClientId);
     doParsimUnpacking(b,this->OriginalExecId);
     doParsimUnpacking(b,this->ActualExecId);
-    doParsimUnpacking(b,this->ResidualTime);
+    doParsimUnpacking(b,this->JobComplexity);
     doParsimUnpacking(b,this->QueueLength);
     doParsimUnpacking(b,this->HasEnded);
     doParsimUnpacking(b,this->Probing);
@@ -306,14 +306,14 @@ void msg_check::setActualExecId(int ActualExecId)
     this->ActualExecId = ActualExecId;
 }
 
-::omnetpp::simtime_t msg_check::getResidualTime() const
+::omnetpp::simtime_t msg_check::getJobComplexity() const
 {
-    return this->ResidualTime;
+    return this->JobComplexity;
 }
 
-void msg_check::setResidualTime(::omnetpp::simtime_t ResidualTime)
+void msg_check::setJobComplexity(::omnetpp::simtime_t JobComplexity)
 {
-    this->ResidualTime = ResidualTime;
+    this->JobComplexity = JobComplexity;
 }
 
 int msg_check::getQueueLength() const
@@ -503,7 +503,7 @@ const char *msg_checkDescriptor::getFieldName(int field) const
         "ClientId",
         "OriginalExecId",
         "ActualExecId",
-        "ResidualTime",
+        "JobComplexity",
         "QueueLength",
         "HasEnded",
         "Probing",
@@ -524,7 +524,7 @@ int msg_checkDescriptor::findField(const char *fieldName) const
     if (fieldName[0]=='C' && strcmp(fieldName, "ClientId")==0) return base+1;
     if (fieldName[0]=='O' && strcmp(fieldName, "OriginalExecId")==0) return base+2;
     if (fieldName[0]=='A' && strcmp(fieldName, "ActualExecId")==0) return base+3;
-    if (fieldName[0]=='R' && strcmp(fieldName, "ResidualTime")==0) return base+4;
+    if (fieldName[0]=='J' && strcmp(fieldName, "JobComplexity")==0) return base+4;
     if (fieldName[0]=='Q' && strcmp(fieldName, "QueueLength")==0) return base+5;
     if (fieldName[0]=='H' && strcmp(fieldName, "HasEnded")==0) return base+6;
     if (fieldName[0]=='P' && strcmp(fieldName, "Probing")==0) return base+7;
@@ -630,7 +630,7 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
         case 1: return long2string(pp->getClientId());
         case 2: return long2string(pp->getOriginalExecId());
         case 3: return long2string(pp->getActualExecId());
-        case 4: return simtime2string(pp->getResidualTime());
+        case 4: return simtime2string(pp->getJobComplexity());
         case 5: return long2string(pp->getQueueLength());
         case 6: return bool2string(pp->getHasEnded());
         case 7: return bool2string(pp->getProbing());
@@ -657,7 +657,7 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
         case 1: pp->setClientId(string2long(value)); return true;
         case 2: pp->setOriginalExecId(string2long(value)); return true;
         case 3: pp->setActualExecId(string2long(value)); return true;
-        case 4: pp->setResidualTime(string2simtime(value)); return true;
+        case 4: pp->setJobComplexity(string2simtime(value)); return true;
         case 5: pp->setQueueLength(string2long(value)); return true;
         case 6: pp->setHasEnded(string2bool(value)); return true;
         case 7: pp->setProbing(string2bool(value)); return true;
