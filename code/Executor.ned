@@ -6,6 +6,7 @@ simple Executor
 		    @display("i=block/queue");
 		int N;
         int E;
+        double probEvent;
 
 // GENERAL STATISTICS
 

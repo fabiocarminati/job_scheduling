@@ -192,8 +192,11 @@ msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kin
     this->ReRouted = false;
     this->Ack = false;
     this->NewJob = false;
-    this->ReBoot = false;
     this->checkPercentageWork = false;
+    this->ReBoot = false;
+    this->NewJobsQueue = false;
+    this->JobQueue = false;
+    this->ReRoutedJobQueue = false;
 }
 
 msg_check::msg_check(const msg_check& other) : ::omnetpp::cPacket(other)
@@ -226,8 +229,11 @@ void msg_check::copy(const msg_check& other)
     this->ReRouted = other.ReRouted;
     this->Ack = other.Ack;
     this->NewJob = other.NewJob;
-    this->ReBoot = other.ReBoot;
     this->checkPercentageWork = other.checkPercentageWork;
+    this->ReBoot = other.ReBoot;
+    this->NewJobsQueue = other.NewJobsQueue;
+    this->JobQueue = other.JobQueue;
+    this->ReRoutedJobQueue = other.ReRoutedJobQueue;
 }
 
 void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
@@ -244,8 +250,11 @@ void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
     doParsimPacking(b,this->ReRouted);
     doParsimPacking(b,this->Ack);
     doParsimPacking(b,this->NewJob);
-    doParsimPacking(b,this->ReBoot);
     doParsimPacking(b,this->checkPercentageWork);
+    doParsimPacking(b,this->ReBoot);
+    doParsimPacking(b,this->NewJobsQueue);
+    doParsimPacking(b,this->JobQueue);
+    doParsimPacking(b,this->ReRoutedJobQueue);
 }
 
 void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
@@ -262,8 +271,11 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->ReRouted);
     doParsimUnpacking(b,this->Ack);
     doParsimUnpacking(b,this->NewJob);
-    doParsimUnpacking(b,this->ReBoot);
     doParsimUnpacking(b,this->checkPercentageWork);
+    doParsimUnpacking(b,this->ReBoot);
+    doParsimUnpacking(b,this->NewJobsQueue);
+    doParsimUnpacking(b,this->JobQueue);
+    doParsimUnpacking(b,this->ReRoutedJobQueue);
 }
 
 int msg_check::getRelativeJobId() const
@@ -376,6 +388,16 @@ void msg_check::setNewJob(bool NewJob)
     this->NewJob = NewJob;
 }
 
+bool msg_check::getCheckPercentageWork() const
+{
+    return this->checkPercentageWork;
+}
+
+void msg_check::setCheckPercentageWork(bool checkPercentageWork)
+{
+    this->checkPercentageWork = checkPercentageWork;
+}
+
 bool msg_check::getReBoot() const
 {
     return this->ReBoot;
@@ -386,14 +408,34 @@ void msg_check::setReBoot(bool ReBoot)
     this->ReBoot = ReBoot;
 }
 
-bool msg_check::getCheckPercentageWork() const
+bool msg_check::getNewJobsQueue() const
 {
-    return this->checkPercentageWork;
+    return this->NewJobsQueue;
 }
 
-void msg_check::setCheckPercentageWork(bool checkPercentageWork)
+void msg_check::setNewJobsQueue(bool NewJobsQueue)
 {
-    this->checkPercentageWork = checkPercentageWork;
+    this->NewJobsQueue = NewJobsQueue;
+}
+
+bool msg_check::getJobQueue() const
+{
+    return this->JobQueue;
+}
+
+void msg_check::setJobQueue(bool JobQueue)
+{
+    this->JobQueue = JobQueue;
+}
+
+bool msg_check::getReRoutedJobQueue() const
+{
+    return this->ReRoutedJobQueue;
+}
+
+void msg_check::setReRoutedJobQueue(bool ReRoutedJobQueue)
+{
+    this->ReRoutedJobQueue = ReRoutedJobQueue;
 }
 
 class msg_checkDescriptor : public omnetpp::cClassDescriptor
@@ -461,7 +503,7 @@ const char *msg_checkDescriptor::getProperty(const char *propertyname) const
 int msg_checkDescriptor::getFieldCount() const
 {
     omnetpp::cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 13+basedesc->getFieldCount() : 13;
+    return basedesc ? 16+basedesc->getFieldCount() : 16;
 }
 
 unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
@@ -486,8 +528,11 @@ unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISEDITABLE,
+        FD_ISEDITABLE,
+        FD_ISEDITABLE,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<13) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<16) ? fieldTypeFlags[field] : 0;
 }
 
 const char *msg_checkDescriptor::getFieldName(int field) const
@@ -510,10 +555,13 @@ const char *msg_checkDescriptor::getFieldName(int field) const
         "ReRouted",
         "Ack",
         "NewJob",
-        "ReBoot",
         "checkPercentageWork",
+        "ReBoot",
+        "NewJobsQueue",
+        "JobQueue",
+        "ReRoutedJobQueue",
     };
-    return (field>=0 && field<13) ? fieldNames[field] : nullptr;
+    return (field>=0 && field<16) ? fieldNames[field] : nullptr;
 }
 
 int msg_checkDescriptor::findField(const char *fieldName) const
@@ -531,8 +579,11 @@ int msg_checkDescriptor::findField(const char *fieldName) const
     if (fieldName[0]=='R' && strcmp(fieldName, "ReRouted")==0) return base+8;
     if (fieldName[0]=='A' && strcmp(fieldName, "Ack")==0) return base+9;
     if (fieldName[0]=='N' && strcmp(fieldName, "NewJob")==0) return base+10;
-    if (fieldName[0]=='R' && strcmp(fieldName, "ReBoot")==0) return base+11;
-    if (fieldName[0]=='c' && strcmp(fieldName, "checkPercentageWork")==0) return base+12;
+    if (fieldName[0]=='c' && strcmp(fieldName, "checkPercentageWork")==0) return base+11;
+    if (fieldName[0]=='R' && strcmp(fieldName, "ReBoot")==0) return base+12;
+    if (fieldName[0]=='N' && strcmp(fieldName, "NewJobsQueue")==0) return base+13;
+    if (fieldName[0]=='J' && strcmp(fieldName, "JobQueue")==0) return base+14;
+    if (fieldName[0]=='R' && strcmp(fieldName, "ReRoutedJobQueue")==0) return base+15;
     return basedesc ? basedesc->findField(fieldName) : -1;
 }
 
@@ -558,8 +609,11 @@ const char *msg_checkDescriptor::getFieldTypeString(int field) const
         "bool",
         "bool",
         "bool",
+        "bool",
+        "bool",
+        "bool",
     };
-    return (field>=0 && field<13) ? fieldTypeStrings[field] : nullptr;
+    return (field>=0 && field<16) ? fieldTypeStrings[field] : nullptr;
 }
 
 const char **msg_checkDescriptor::getFieldPropertyNames(int field) const
@@ -637,8 +691,11 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
         case 8: return bool2string(pp->getReRouted());
         case 9: return bool2string(pp->getAck());
         case 10: return bool2string(pp->getNewJob());
-        case 11: return bool2string(pp->getReBoot());
-        case 12: return bool2string(pp->getCheckPercentageWork());
+        case 11: return bool2string(pp->getCheckPercentageWork());
+        case 12: return bool2string(pp->getReBoot());
+        case 13: return bool2string(pp->getNewJobsQueue());
+        case 14: return bool2string(pp->getJobQueue());
+        case 15: return bool2string(pp->getReRoutedJobQueue());
         default: return "";
     }
 }
@@ -664,8 +721,11 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
         case 8: pp->setReRouted(string2bool(value)); return true;
         case 9: pp->setAck(string2bool(value)); return true;
         case 10: pp->setNewJob(string2bool(value)); return true;
-        case 11: pp->setReBoot(string2bool(value)); return true;
-        case 12: pp->setCheckPercentageWork(string2bool(value)); return true;
+        case 11: pp->setCheckPercentageWork(string2bool(value)); return true;
+        case 12: pp->setReBoot(string2bool(value)); return true;
+        case 13: pp->setNewJobsQueue(string2bool(value)); return true;
+        case 14: pp->setJobQueue(string2bool(value)); return true;
+        case 15: pp->setReRoutedJobQueue(string2bool(value)); return true;
         default: return false;
     }
 }

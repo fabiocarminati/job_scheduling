@@ -10,7 +10,10 @@ packet msg_check //name of the new type of message
     bool Probing;
     bool ReRouted;
     bool Ack;
-    bool NewJob;
-    bool ReBoot;
+    bool NewJob;  
     bool checkPercentageWork;
+   	bool ReBoot;
+    bool NewJobsQueue;
+    bool JobQueue;
+    bool ReRoutedJobQueue;
 };

@@ -34,8 +34,11 @@
  *     bool ReRouted;
  *     bool Ack;
  *     bool NewJob;
- *     bool ReBoot;
  *     bool checkPercentageWork;
+ *     bool ReBoot;
+ *     bool NewJobsQueue;
+ *     bool JobQueue;
+ *     bool ReRoutedJobQueue;
  * }
  * </pre>
  */
@@ -53,8 +56,11 @@ class msg_check : public ::omnetpp::cPacket
     bool ReRouted;
     bool Ack;
     bool NewJob;
-    bool ReBoot;
     bool checkPercentageWork;
+    bool ReBoot;
+    bool NewJobsQueue;
+    bool JobQueue;
+    bool ReRoutedJobQueue;
 
   private:
     void copy(const msg_check& other);
@@ -95,10 +101,16 @@ class msg_check : public ::omnetpp::cPacket
     virtual void setAck(bool Ack);
     virtual bool getNewJob() const;
     virtual void setNewJob(bool NewJob);
-    virtual bool getReBoot() const;
-    virtual void setReBoot(bool ReBoot);
     virtual bool getCheckPercentageWork() const;
     virtual void setCheckPercentageWork(bool checkPercentageWork);
+    virtual bool getReBoot() const;
+    virtual void setReBoot(bool ReBoot);
+    virtual bool getNewJobsQueue() const;
+    virtual void setNewJobsQueue(bool NewJobsQueue);
+    virtual bool getJobQueue() const;
+    virtual void setJobQueue(bool JobQueue);
+    virtual bool getReRoutedJobQueue() const;
+    virtual void setReRoutedJobQueue(bool ReRoutedJobQueue);
 };
 
 inline void doParsimPacking(omnetpp::cCommBuffer *b, const msg_check& obj) {obj.parsimPack(b);}

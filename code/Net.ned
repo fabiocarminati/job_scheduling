@@ -3,6 +3,7 @@ network Net
     parameters:
         int N;
         int E;
+      
         @display("bgb=718,496");
         @figure[description](type=text; pos=5,20; font=,,bold; text="Distributed job scheduling");
 
