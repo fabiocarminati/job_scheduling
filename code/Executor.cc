@@ -7,7 +7,7 @@
 using namespace omnetpp;
 class Executor : public cSimpleModule {
 private:
-    msg_check *ackToActualExec;
+
     msg_check *timeoutJobComputation;
     msg_check *timeoutLoadBalancing;
     msg_check *timeoutReRouted;
@@ -52,7 +52,7 @@ public:
 Define_Module(Executor);
 Executor::Executor()
 {
-    timeoutLoadBalancing = ackToActualExec = timeoutFailureEnd = nullptr;
+    timeoutLoadBalancing = timeoutFailureEnd = nullptr;
     timeoutJobComputation = timeoutReRouted = nullptr;
 }
 
@@ -292,6 +292,7 @@ void Executor::ReRoutedJobEnd(msg_check *msg){
                ->It will stop the timeout event timeoutReSendOriginal for the ACK
                ->Notify his secure storage to delete the local copy of the previously processed packet
            */
+    msg_check *ackToActualExec;
     if(msg->getAck()==true){
       EV << "ACK received from original exec "<<msg->getOriginalExecId() <<" for "<<msg->getRelativeJobId()<<endl;
       ackToActualExec=msg->dup();
@@ -319,7 +320,7 @@ void Executor::ReRoutedJobEnd(msg_check *msg){
 }
 
 void Executor::newJob(msg_check *msg){
-    msg_check *msgSend;
+    msg_check *msgSend,*tmp;
     const char *id;
     std::string jobId;
     int machine, port_id;
@@ -341,6 +342,7 @@ void Executor::newJob(msg_check *msg){
     EV<<"ADD NEWJOBSQUEUE"<<endl;
     send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
     newJobsQueue.insert(msg->dup());
+    EV<<"NEW JOB QUEUE LENGTH NEW ARRIVAL "<<newJobsQueue.getLength();
     //Reply to the client
     port_id=msg->getClientId()-1;
     msgSend=msg->dup();
@@ -349,17 +351,28 @@ void Executor::newJob(msg_check *msg){
     EV<<"First time the packet is in the cluster:define his "<<id<<endl;
     msg->setNewJob(false);
 
-
+/*
     if(!jobQueue.getLength()){
         jobQueue.insert(msg->dup());
         EV<<"IInsert job queue in storage"<<endl;
         msgSend=msg->dup();
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
+        */
 
-        //if(!timeoutJobComputation->isScheduled())
-        timeoutJobComplexity = msg->getJobComplexity();
-        scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
+    if(!jobQueue.getLength()){
+        tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
+        jobQueue.insert(msg->dup());
+        EV<<"IInsert job queue in storage"<<endl;
+        msgSend=msg->dup();
+        msgSend->setJobQueue(true);
+        send(msgSend,"backup_send$o");
+        //delete tmp;
+
+        if(!timeoutJobComputation->isScheduled()){
+            timeoutJobComplexity = msg->getJobComplexity();
+            scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
+        }
     }
     else
         balancedJob(msg);
@@ -387,22 +400,24 @@ void Executor::timeoutLoadBalancingHandler(){
     }
     tmp = check_and_cast<msg_check *>(newJobsQueue.front());
     if(processing){
+        EV<<"NEW QUEUE NO LOAD "<<newJobsQueue.getLength()<<endl;
         tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
         msgSend=tmp->dup();
             //msgSend->setActualExecId(msg->getActualExecId());
         msgSend->setNewJobsQueue(true);
+
         EV<<"Send to the backup newjobqueue pop event "<<endl;
+        EV<<"NEW QUEUE NO LOAD "<<newJobsQueue.getLength()<<endl;
         send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
-
-
-
+        msgSend=tmp->dup();
         jobQueue.insert(tmp);
         EV<<"IIInsert job queue in storage"<<endl;
-        msgSend=tmp->dup();
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
+
         if(!timeoutJobComputation->isScheduled()){
             timeoutJobComplexity = tmp->getJobComplexity();
+            EV<<"load balancingnow useless"<<endl;
             scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
         }
         probingMode = false;
