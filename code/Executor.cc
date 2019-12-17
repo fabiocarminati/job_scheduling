@@ -192,7 +192,7 @@ void Executor::balancedJob(msg_check *msg){
     int i;
     int src_id;
     src_id=msg->getClientId();
-    EV<<"msg ID "<<msg->getRelativeJobId()<<" coming from user ID "<<src_id<<" trying to distribute"<<endl;
+    EV<<"msg ID "<<msg->getRelativeJobId()<<" coming from user ID "<<src_id-1<<" trying to distribute"<<endl;
     if(!probingMode){  //==-1 means that the coming msg has been forwarded by another machine after load balancing
         msg->setHasEnded(false);
         msg->setProbing(true);
@@ -252,13 +252,14 @@ void Executor::reRoutedHandler(msg_check *msg){
         send(msgSend,"load_send",msgSend->getOriginalExecId());
 
         jobQueue.insert(msg->dup());
-        EV<<"Insert job queue in storage"<<endl;
+        EV<<"Insert jobQueue in storage"<<endl;
         msgSend=msg->dup();
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
 
         if(!timeoutJobComputation->isScheduled()){
              timeoutJobComplexity = msgSend->getJobComplexity();
+             EV<<"The new executor is idle:it starts executing immediately the packet"<<endl;
              scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
         }
         EV<<"new job in the queue, actual length: "<< jobQueue.getLength()<<endl;
@@ -320,7 +321,7 @@ void Executor::ReRoutedJobEnd(msg_check *msg){
 }
 
 void Executor::newJob(msg_check *msg){
-    msg_check *msgSend,*tmp;
+    msg_check *msgSend;
     const char *id;
     std::string jobId;
     int machine, port_id;
@@ -341,7 +342,7 @@ void Executor::newJob(msg_check *msg){
     EV<<"Send to the backup info about original "<<msgSend->getOriginalExecId()<<" and actual "<<msgSend->getActualExecId()<<" of the "<<id<<endl;
     EV<<"ADD NEWJOBSQUEUE"<<endl;
     send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
-    newJobsQueue.insert(msg->dup());
+
     EV<<"NEW JOB QUEUE LENGTH NEW ARRIVAL "<<newJobsQueue.getLength();
     //Reply to the client
     port_id=msg->getClientId()-1;
@@ -361,7 +362,7 @@ void Executor::newJob(msg_check *msg){
         */
 
     if(!jobQueue.getLength()){
-        tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
+        //tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
         jobQueue.insert(msg->dup());
         EV<<"IInsert job queue in storage"<<endl;
         msgSend=msg->dup();
@@ -371,11 +372,15 @@ void Executor::newJob(msg_check *msg){
 
         if(!timeoutJobComputation->isScheduled()){
             timeoutJobComplexity = msg->getJobComplexity();
+            EV<<"New message arrived with idle server:execute it immediately:Job Id "<<id<<endl;
             scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
         }
     }
-    else
+    else{
+        newJobsQueue.insert(msg->dup());
         balancedJob(msg);
+
+    }
 }
 
 void Executor::timeoutLoadBalancingHandler(){
@@ -400,7 +405,7 @@ void Executor::timeoutLoadBalancingHandler(){
     }
     tmp = check_and_cast<msg_check *>(newJobsQueue.front());
     if(processing){
-        EV<<"NEW QUEUE NO LOAD "<<newJobsQueue.getLength()<<endl;
+        EV<<"NO one has a better queue than me "<<newJobsQueue.getLength()<<endl;
         tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
         msgSend=tmp->dup();
             //msgSend->setActualExecId(msg->getActualExecId());
@@ -411,13 +416,13 @@ void Executor::timeoutLoadBalancingHandler(){
         send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
         msgSend=tmp->dup();
         jobQueue.insert(tmp);
-        EV<<"IIInsert job queue in storage"<<endl;
+        EV<<"IIInsert job queue in storage giben that no load balancing is performed"<<endl;
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
-
+        //chi lo dice che sono idle?nisuno
         if(!timeoutJobComputation->isScheduled()){
             timeoutJobComplexity = tmp->getJobComplexity();
-            EV<<"load balancingnow useless"<<endl;
+            EV<<"load balancing is useless and i am idle indeeed jobQueue length "<<jobQueue.getLength()<<endl;
             scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
         }
         probingMode = false;
@@ -435,11 +440,11 @@ void Executor::timeoutLoadBalancingHandler(){
         tmp->setActualExecId(actualExec);
 
         EV<<"Send to the machine "<<actualExec<<" that has a lower queue the "<<tmp->getRelativeJobId()<<endl;
-        send(tmp->dup(),"load_send", actualExec);
+        send(tmp->dup(),"load_send", actualExec); //tmp rimane dentro i miei newjobs???Non va nei rerouted?si lo fa alla ricezione dell ack
         scheduleAt(simTime()+timeoutLoad, timeoutReRouted);
     }
     EV<<"Final executor "<<actualExec<<endl;
-    EV<<"queue of jobs "<<jobQueue.getLength()<<endl;
+    EV<<"jobQueue after timeout load balancing "<<jobQueue.getLength()<<endl;
 }
 
 void Executor::timeoutJobExecutionHandler(){
