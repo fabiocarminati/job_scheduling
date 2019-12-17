@@ -324,9 +324,9 @@ void Executor::ReRoutedJobEnd(msg_check *msg){
         send(ackToActualExec, "load_send",ackToActualExec->getActualExecId());
         ackToActualExec=msg->dup();
         send(ackToActualExec, "backup_send$o"); //the original exec notifies his own storage to delete the entry
-        ackToActualExec=msg->dup();
+        /*ackToActualExec=msg->dup();
         completedJob.add(ackToActualExec);
-        EV<<"Original exec add the forwarded job to his COMPLETEDJOB QUEUE after sending the ack"<<endl;
+        EV<<"Original exec add the forwarded job to his COMPLETEDJOB QUEUE after sending the ack"<<endl;*/
         //per ora non voglio che executor dica al client end of execution se non e lui a chiederlo
         //ackToActualExec=msg->dup();
        // send(ackToActualExec, "exec$o",msg->getClientId()-1);
@@ -478,12 +478,12 @@ void Executor::timeoutJobExecutionHandler(){
     portId = msgServiced->getClientId()-1;  //Source id-1=portId
     EV<<"Completed service of "<<originalExecutor<<"with ID: "<<jobId<<" creating by the user ID "<<portId<<endl;
     msgServiced->setHasEnded(true);
-    if(msgServiced->getReRouted()==true){
+    /*if(msgServiced->getReRouted()==true){
          msgSend= msgServiced->dup();
          send(msgSend,"load_send",msgSend->getOriginalExecId());
          scheduleAt(simTime()+timeoutEndActual,timeoutEndOfReRoutedExecution);
      }
-
+*/
     EV<<"Notify end of execution to storage"<<endl;
     msgSend= msgServiced->dup();
     msgSend->setJobQueue(true);
@@ -549,9 +549,9 @@ void Executor::selfMessage(msg_check *msg){
            if (msg == timeoutJobComputation){
                timeoutJobExecutionHandler();
            }
-           else
+           /*else
                if(msg==timeoutEndOfReRoutedExecution){
                    EV<<"Original exec is unavailable;I won't retry but the original exec once is active can ask me "<<endl;
 
-               }
+               }*/
 }

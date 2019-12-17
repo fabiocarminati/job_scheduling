@@ -61,15 +61,17 @@ void Storage::handleMessage(cMessage *cmsg) {
    // Casting from cMessage to msg_check
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
    msg_check *msgBackup;
-   std::string jobId;
+   std::string id,jobId;
+   //const char *jobId;
 
-   jobId.append(std::to_string(msg->getOriginalExecId()));
-   jobId.append("-");
-   jobId.append(std::to_string(msg->getRelativeJobId()));
+   id.append(std::to_string(msg->getOriginalExecId()));
+   id.append("-");
+   id.append(std::to_string(msg->getRelativeJobId()));
+   //jobId=id.c_str();
   // EV<<"reboot flag "<<msg->getReBoot()<<endl;
    //EV<<"message name "<<msg->getName()<<endl;
    if(msg->getReBoot()==true){
-       EV<<"the failure of "<<msg->getOriginalExecId()<<"is detected by the storage"<<endl;
+       EV<<"the failure of executor "<<msg->getOriginalExecId()<<" is detected by the storage"<<endl;
        /*msg->setJobQueue(true);
        executorReboot(msg,jobId,jobQueue,searchJobQueue);
        msg->setJobQueue(false);
@@ -78,11 +80,11 @@ void Storage::handleMessage(cMessage *cmsg) {
        msg->setJobQueue(false);
        msg->setNewJobsQueue(false);
        msg->setReRoutedJobQueue(true);
-       executorReboot(msg,jobId,reRoutedQueue,searchReRoutedQueue);
-      */
+       executorReboot(msg,jobId,reRoutedQueue,searchReRoutedQueue);*/
+
 
        for (auto searchJobQueue = jobQueue.begin();searchJobQueue != jobQueue.end(); ++searchJobQueue){
-           //EV<<"This is the job id "<<search->first<<endl;
+           EV<<"Recove JOBr "<<searchJobQueue->first<<endl;
            msgBackup=searchJobQueue->second->dup();
            msgBackup->setName("send to the executor the backup copy of the jobs that he has to process");
            msgBackup->setJobQueue(true);
@@ -90,7 +92,7 @@ void Storage::handleMessage(cMessage *cmsg) {
            EV<<"send the backup copy for "<<jobId<<endl;
        }
        for (auto searchNewJobsQueue = newJobsQueue.begin();searchNewJobsQueue != newJobsQueue.end(); ++searchNewJobsQueue){
-           //EV<<"This is the job id "<<search->first<<endl;
+           EV<<"Recover NEWJOB"<<searchNewJobsQueue->first<<endl;
            msgBackup=searchNewJobsQueue->second->dup();
            msgBackup->setName("send to the executor the backup copy of the jobs that he has to process");
            msgBackup->setNewJobsQueue(true);
@@ -98,7 +100,7 @@ void Storage::handleMessage(cMessage *cmsg) {
            EV<<"send the backup copy for "<<jobId<<endl;
        }
        for (auto searchReRoutedQueue = reRoutedQueue.begin();searchReRoutedQueue != reRoutedQueue.end(); ++searchReRoutedQueue){
-           //EV<<"This is the job id "<<search->first<<endl;
+           EV<<"Recover REROUTED "<< searchReRoutedQueue->first<<endl;
            msgBackup=searchReRoutedQueue->second->dup();
            msgBackup->setName("send to the executor the backup copy of the jobs that he has to process");
            msgBackup->setReRoutedJobQueue(true);
