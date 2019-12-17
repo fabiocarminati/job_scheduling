@@ -100,24 +100,47 @@ void Executor::handleMessage(cMessage *cmsg) {
 
    failureEvent(msg,probEvent);
    if(failure){
-     delete msg;
-     return;
+       if(msg==timeoutFailureEnd) {
+            msgSend = new msg_check("Failure end");
+            msgSend->setReBoot(true); //problema:poi rientro in selfEvents
+            //msgSend->setHasEnded(false);
+            //msgSend->setProbing(false);
+            //msgSend->setJobComplexity(0.2); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
+            //msgSend->setRelativeJobId(0); //will be useful for computing the per class extended service time
+           // msgSend->setClientId(-1);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
+            msgSend->setActualExecId(myId);
+            msgSend->setOriginalExecId(myId);
+           // msgSend->setQueueLength(0);
+            /*msgSend->setReRouted(false);
+            msgSend->setAck(false);
+            msgSend->setNewJob(false);
+            msgSend->setReBoot(false);
+            msgSend->setJobQueue(false);
+            msgSend->setNewJobsQueue(false);
+            msgSend->setReRoutedJobQueue(false);*/
+            EV<<"Reboot of the executor starts"<<endl;
+            send(msgSend,"backup_send$o");
+            failure=false;
+       }
+       else
+         //delete msg;
+         return;
    }
-   if(msg->isSelfMessage()){
-     selfMessage(msg);
-   }else if(msg->getReBoot()==true){
-             rePopulateQueues(msg);
-         }else if(msg->getNewJob()==true){
-                   newJob(msg);
-               }else if(msg->getProbing()==true){
-                         probeHandler(msg);
-                     }else if(msg->getHasEnded()==true){
-                               ReRoutedJobEnd(msg);
-                           }else if(msg->getReRouted()==true){
-                                     reRoutedHandler(msg);
-                                 }
+   else if(msg->isSelfMessage()){
+               selfMessage(msg);
+         }else if(msg->getReBoot()==true){
+                     rePopulateQueues(msg);
+                 }else if(msg->getNewJob()==true){
+                           newJob(msg);
+                       }else if(msg->getProbing()==true){
+                                 probeHandler(msg);
+                             }else if(msg->getHasEnded()==true){
+                                       ReRoutedJobEnd(msg);
+                                   }else if(msg->getReRouted()==true){
+                                             reRoutedHandler(msg);
+                                         }
 
-       delete msg;
+       //delete msg;
 
 }
 void Executor::rePopulateQueues(msg_check *msg){
@@ -146,22 +169,22 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
    if(failure){
      //outGoingPacket.clear();
      newJobsQueue.clear();
-     jobQueue.clear(); //cancel(timeoutjobscheduling)
-     balanceResponses.clear();//cancel(timeoutload)
+     jobQueue.clear();
+     balanceResponses.clear();
      reRoutedJobs.clear();
-     //delete msg;
+     EV<<"ERASE NEW "<<newJobsQueue.getLength()<<" JOB "<<jobQueue.getLength()<<" BALANCED"<<balanceResponses.getLength()<<" RE ROUTED "<<reRoutedJobs.size();
+     cancelEvent(timeoutReRouted);
+     cancelEvent(timeoutJobComputation);
+     cancelEvent(timeoutLoadBalancing);
+     //cancelEvent(timeoutFailureEnd);
      scheduleAt(simTime()+timeoutFailure, timeoutFailureEnd);
+     EV<<"A failure has happened"<<endl;
 
    }
  }
  else
-     if(msg==timeoutFailureEnd) {
-         msgSend->setReBoot(true); //missing new,nullptr....
-         send(msgSend,"backup_send$o");
-         failure=false;
-     }
+         EV<<"Due to Failure message is lost "<<endl;
 
-         //delete msg;
 }
 
 void Executor::balancedJob(msg_check *msg){
@@ -304,7 +327,7 @@ void Executor::newJob(msg_check *msg){
     nArrived++;
     //Create the JobId
     machine=msg->getOriginalExecId();
-    jobId="Job ID: ";
+    //jobId="Job ID: ";
     jobId.append(std::to_string(machine));
     jobId.append("-");
     jobId.append(std::to_string(nArrived));
@@ -315,6 +338,7 @@ void Executor::newJob(msg_check *msg){
     //msgSend->setActualExecId(msg->getActualExecId());
     msgSend->setNewJobsQueue(true);
     EV<<"Send to the backup info about original "<<msgSend->getOriginalExecId()<<" and actual "<<msgSend->getActualExecId()<<" of the "<<id<<endl;
+    EV<<"ADD NEWJOBSQUEUE"<<endl;
     send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
     newJobsQueue.insert(msg->dup());
     //Reply to the client
@@ -328,7 +352,7 @@ void Executor::newJob(msg_check *msg){
 
     if(!jobQueue.getLength()){
         jobQueue.insert(msg->dup());
-        EV<<"Insert job queue in storage"<<endl;
+        EV<<"IInsert job queue in storage"<<endl;
         msgSend=msg->dup();
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
@@ -373,7 +397,7 @@ void Executor::timeoutLoadBalancingHandler(){
 
 
         jobQueue.insert(tmp);
-        EV<<"Insert job queue in storage"<<endl;
+        EV<<"IIInsert job queue in storage"<<endl;
         msgSend=tmp->dup();
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");

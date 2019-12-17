@@ -66,8 +66,10 @@ void Storage::handleMessage(cMessage *cmsg) {
    jobId.append(std::to_string(msg->getOriginalExecId()));
    jobId.append("-");
    jobId.append(std::to_string(msg->getRelativeJobId()));
-
+  // EV<<"reboot flag "<<msg->getReBoot()<<endl;
+   //EV<<"message name "<<msg->getName()<<endl;
    if(msg->getReBoot()==true){
+       EV<<"the failure of "<<msg->getOriginalExecId()<<"is detected by the storage"<<endl;
        /*msg->setJobQueue(true);
        executorReboot(msg,jobId,jobQueue,searchJobQueue);
        msg->setJobQueue(false);
@@ -107,12 +109,14 @@ void Storage::handleMessage(cMessage *cmsg) {
 
    }else if(msg->getNewJobsQueue()==true){
        searchMessage(jobId,msg,newJobsQueue,searchNewJobsQueue);
-
+       EV<<"add NEWJOB element that is: "<<jobId<<endl;
 
    }else if(msg->getJobQueue()==true){
        searchMessage(jobId,msg,jobQueue,searchJobQueue);
+       EV<<"add JOBID element that is: "<<jobId<<endl;
    }else if(msg->getReRoutedJobQueue()==true){
        searchMessage(jobId,msg,reRoutedQueue,searchReRoutedQueue);
+       EV<<"add REROUTED element that is: "<<jobId<<endl;
    }
 
    delete msg;
