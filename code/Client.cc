@@ -47,7 +47,7 @@ void Client::initialize() {
     timeout=0.5;
     sourceID=getId()-1;   //defines the Priority-ID of the message that each source will transmit(different sources send different priorities messages)
 
-    EV<<"Client ID "<<sourceID<<endl;
+    //EV<<"Client ID "<<sourceID<<endl;
     scheduleAt(simTime(), sendMessageEvent); //generates the first packet
     E = par("E"); //non volatile parameters --once defined they never change
     N = par("N");

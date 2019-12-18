@@ -12,7 +12,7 @@ private:
     msg_check *timeoutLoadBalancing;
     msg_check *timeoutReRouted;
     msg_check *timeoutFailureEnd;
-    msg_check *timeoutEndOfReRoutedExecution;
+    //msg_check *timeoutEndOfReRoutedExecution;
 
     simtime_t timeoutLoad;
 
@@ -35,7 +35,7 @@ private:
     void newJob(msg_check *msg);
     void balancedJob(msg_check *msg);
     void probeHandler(msg_check *msg);
-    void ReRoutedJobEnd(msg_check *msg);
+   // void ReRoutedJobEnd(msg_check *msg);
     void reRoutedHandler(msg_check *msg);
     void timeoutLoadBalancingHandler();
     void timeoutJobExecutionHandler();
@@ -58,7 +58,7 @@ Executor::Executor()
 {
     timeoutLoadBalancing = timeoutFailureEnd = nullptr;
     timeoutJobComputation = timeoutReRouted = nullptr;
-    timeoutEndOfReRoutedExecution = nullptr;
+    //timeoutEndOfReRoutedExecution = nullptr;
 }
 
 Executor::~Executor()
@@ -67,7 +67,7 @@ Executor::~Executor()
     cancelAndDelete(timeoutJobComputation);
     cancelAndDelete(timeoutReRouted);
     cancelAndDelete(timeoutFailureEnd);
-    cancelAndDelete(timeoutEndOfReRoutedExecution);
+    //cancelAndDelete(timeoutEndOfReRoutedExecution);
 }
 
 void Executor::initialize() {
@@ -75,7 +75,7 @@ void Executor::initialize() {
     N= par("N");
     E = par("E"); //non volatile parameters --once defined they never change
     myId=getId()-2-N;
-    EV<<myId<<endl;
+   // EV<<myId<<endl;
     nArrived=0;
 
     probEvent=par("probEvent");
@@ -90,7 +90,7 @@ void Executor::initialize() {
     timeoutLoadBalancing = new msg_check("timeoutLoadBalancing");
     timeoutReRouted = new msg_check("timeoutReRouted");
     timeoutFailureEnd = new msg_check("timeoutFailureEnd");
-    timeoutEndOfReRoutedExecution = new msg_check("timeout actual exec notifies end of execution to original exec");
+    //timeoutEndOfReRoutedExecution = new msg_check("timeout actual exec notifies end of execution to original exec");
 
     timeoutLoad=0.1;
 
@@ -122,7 +122,7 @@ void Executor::handleMessage(cMessage *cmsg) {
        else if(!msg->isSelfMessage() && msg->getReBoot()==true){
                            // EV<<"RE "<<msg->getReRouted()<<" JOB "<<msg->getJobQueue()<<" NEW "<<msg->getNewJobsQueue()<<endl;
                 rePopulateQueues(msg);
-                delete(msg);
+                //delete(msg);
              }
            else{
                EV<<"The executor is not in normal mode and this is not a msg coming from the backup:ignore it"<<endl;
@@ -135,9 +135,9 @@ void Executor::handleMessage(cMessage *cmsg) {
                            newJob(msg);
                        }else if(msg->getProbing()==true){
                                  probeHandler(msg);
-                             }else if(msg->getHasEnded()==true){
+                             /*}else if(msg->getHasEnded()==true){
                                        ReRoutedJobEnd(msg);
-                                   }else if(msg->getReRouted()==true){
+                                   */}else if(msg->getReRouted()==true){
                                              reRoutedHandler(msg);
                                          }
 
@@ -158,13 +158,14 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
      jobQueue.clear();
      balanceResponses.clear();
      reRoutedJobs.clear();
+     completedJob.clear();
      probingMode = false;//if probingMode = true means that i am waiting for responses by other executors but if I fail I stop also the timeout
      //thus I will never be able in the future to do probing becauset probingMode=true forever
 
      cancelEvent(timeoutReRouted);
      cancelEvent(timeoutJobComputation);
      cancelEvent(timeoutLoadBalancing);
-     cancelEvent(timeoutEndOfReRoutedExecution);
+     //cancelEvent(timeoutEndOfReRoutedExecution);
      cancelEvent(timeoutFailureEnd);
      scheduleAt(simTime()+timeoutFailure, timeoutFailureEnd);
      EV<<"A failure has happened:start failure phase "<<"......"<<endl;
@@ -178,6 +179,7 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
 
 void Executor::rePopulateQueues(msg_check *msg){
     if(msg->getBackupComplete()==false){
+        msg->setReBoot(false);
         if(msg->getNewJobsQueue()==true){
             newJobsQueue.insert(msg->dup());
             EV<<"BACKUP In the new_job_queue"<<endl;
@@ -185,15 +187,20 @@ void Executor::rePopulateQueues(msg_check *msg){
         }else if(msg->getJobQueue()==true){
                   if(msg->getReRouted()==true){
                       jobQueue.insert(msg->dup());
-                      EV<<"BACKUP In the job_queue"<<endl;
+                      EV<<"BACKUP in new because REROUTED"<<endl;
                   }else{
                       newJobsQueue.insert(msg->dup());
+                      EV<<"BACKUP In the new job because has not been re routed"<<endl;
                       //balancedJob(msg);
                   }
               }else if(msg->getReRoutedJobQueue()==true){
                       reRoutedJobs.add(msg->dup());
                       EV<<"BACKUP In the rerouted_queue"<<endl;
-              }
+                     }else if(msg->getCompletedQueue()==true){
+                                  completedJob.add(msg->dup());
+                                  EV<<"BACKUP in completed jobs"<<endl;
+
+                           }
     }
     else{
         EV<<"The backup process is over, executor is now in normal execution mode"<<endl<<".........."<<endl;
@@ -206,13 +213,19 @@ void Executor::restartNormalMode(){
     msg_check *msgServiced,*tmp;
     simtime_t timeoutJobComplexity;
     int jobId,portId;
+    EV<<"After recover Show me JOB "<<jobQueue.getLength()<<endl;
+    EV<<"Show me NEW "<<newJobsQueue.getLength()<<endl;
+    EV<<"Show me REROURTED "<<reRoutedJobs.size()<<endl;
+    EV<<"Show me ENDED "<<completedJob.size()<<endl;
     if(jobQueue.isEmpty()){
         if(newJobsQueue.isEmpty())
             EV<<"JOB and NEWJOB queue are idle, the machine goes IDLE"<<endl;
-        else{
-            tmp = check_and_cast<msg_check *>(newJobsQueue.front());
-            balancedJob(tmp);
-        }
+        else if(newJobsQueue.getLength()>0){
+                tmp = check_and_cast<msg_check *>(newJobsQueue.front());
+                balancedJob(tmp);
+            }
+
+
     }
     else{
          msgServiced = check_and_cast<msg_check *>(jobQueue.front());
@@ -249,7 +262,9 @@ void Executor::balancedJob(msg_check *msg){
          //TO DO:ADD ONE TIMEOUT FOR ALL
         }
         probingMode = true;
-        scheduleAt(simTime()+timeoutLoad, timeoutLoadBalancing);
+        if(!timeoutLoadBalancing->isScheduled()){
+            scheduleAt(simTime()+timeoutLoad, timeoutLoadBalancing);
+        }
     }
 }
 
@@ -292,7 +307,7 @@ void Executor::reRoutedHandler(msg_check *msg){
         send(msgSend,"load_send",msgSend->getOriginalExecId());
 
         jobQueue.insert(msg->dup());
-        EV<<"Insert jobQueue in storage"<<endl;
+        //EV<<"Insert jobQueue in storage"<<endl;
         msgSend=msg->dup();
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
@@ -308,16 +323,17 @@ void Executor::reRoutedHandler(msg_check *msg){
         tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
         msgSend=tmp->dup();
         msgSend->setNewJobsQueue(true);
-        EV<<"Send to the backup newjobqueue pop event "<<endl;
+        //EV<<"Send to the backup newjobqueue pop event "<<endl;
         send(msgSend,"backup_send$o");
 
 
         msgSend=tmp->dup();
         msgSend->setReRoutedJobQueue(true);
-        EV<<"Send to the backup reroutedjobqueue add event "<<endl;
+        //EV<<"Send to the backup reroutedjobqueue add event "<<endl;
         send(msgSend,"backup_send$o");
 
         reRoutedJobs.add(tmp);
+
         probingMode = false;
         if(newJobsQueue.getLength()>0){
             tmp = check_and_cast<msg_check *>(newJobsQueue.front());
@@ -328,34 +344,34 @@ void Executor::reRoutedHandler(msg_check *msg){
     }
 }
 
-void Executor::ReRoutedJobEnd(msg_check *msg){
-    /*When the actual exec receives that ACK:
+/*void Executor::ReRoutedJobEnd(msg_check *msg){
+    When the actual exec receives that ACK:
                ->It will stop the timeout event timeoutReSendOriginal for the ACK
                ->Notify his secure storage to delete the local copy of the previously processed packet
-           */
+
     msg_check *ackToActualExec;
     if(msg->getAck()==true){
       EV << "ACK received from original exec "<<msg->getOriginalExecId() <<" for "<<msg->getRelativeJobId()<<endl;
       ackToActualExec=msg->dup();
       send(ackToActualExec, "backup_send$o");
-      cancelEvent(timeoutEndOfReRoutedExecution);
+      //cancelEvent(timeoutEndOfReRoutedExecution);
 
     }
     else{
-        /*When the original exec receives the msg notifying the end of processing by actual exec:
+        When the original exec receives the msg notifying the end of processing by actual exec:
               ->Sends the ACK to the actual exec
               ->Notifies his secure storage to delete the local copy of the previously forwarded packet to the actual exec
               ->Notifies the client the end of the processing
-              */
+
         EV << "Send the ACK to the actual exec "<<msg->getActualExecId() <<" for "<<msg->getRelativeJobId()<<endl;
         ackToActualExec=msg->dup();
         ackToActualExec->setAck(true);
         send(ackToActualExec, "load_send",ackToActualExec->getActualExecId());
         ackToActualExec=msg->dup();
         send(ackToActualExec, "backup_send$o"); //the original exec notifies his own storage to delete the entry
-        /*ackToActualExec=msg->dup();
+        ackToActualExec=msg->dup();
         completedJob.add(ackToActualExec);
-        EV<<"Original exec add the forwarded job to his COMPLETEDJOB QUEUE after sending the ack"<<endl;*/
+        EV<<"Original exec add the forwarded job to his COMPLETEDJOB QUEUE after sending the ack"<<endl;
         //per ora non voglio che executor dica al client end of execution se non e lui a chiederlo
         //ackToActualExec=msg->dup();
        // send(ackToActualExec, "exec$o",msg->getClientId()-1);
@@ -364,7 +380,7 @@ void Executor::ReRoutedJobEnd(msg_check *msg){
     }
       //delete the copy in the local storage
 }
-
+*/
 void Executor::newJob(msg_check *msg){
     msg_check *msgSend;
     const char *id;
@@ -382,13 +398,8 @@ void Executor::newJob(msg_check *msg){
     //save the message to the stable storage
     msg->setRelativeJobId(nArrived);
     msgSend=msg->dup();
-    //msgSend->setActualExecId(msg->getActualExecId());
-    msgSend->setNewJobsQueue(true);
-    EV<<"Send to the backup info about original "<<msgSend->getOriginalExecId()<<" and actual "<<msgSend->getActualExecId()<<" of the "<<id<<endl;
-    EV<<"ADD NEWJOBSQUEUE"<<endl;
-    send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
 
-    EV<<"NEW JOB QUEUE LENGTH NEW ARRIVAL "<<newJobsQueue.getLength();
+
     //Reply to the client
     port_id=msg->getClientId()-1;
     msgSend=msg->dup();
@@ -409,7 +420,7 @@ void Executor::newJob(msg_check *msg){
     if(!jobQueue.getLength()){
         //tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
         jobQueue.insert(msg->dup());
-        EV<<"IInsert job queue in storage"<<endl;
+        //EV<<"IInsert job queue in storage"<<endl;
         msgSend=msg->dup();
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
@@ -422,6 +433,10 @@ void Executor::newJob(msg_check *msg){
         }
     }
     else{
+        msgSend=msg->dup();
+        msgSend->setNewJobsQueue(true);
+       // EV<<"Send to the backup info about original "<<msgSend->getOriginalExecId()<<" and actual "<<msgSend->getActualExecId()<<" of the "<<id<<endl;
+        send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
         newJobsQueue.insert(msg->dup());
         balancedJob(msg);
 
@@ -456,12 +471,12 @@ void Executor::timeoutLoadBalancingHandler(){
             //msgSend->setActualExecId(msg->getActualExecId());
         msgSend->setNewJobsQueue(true);
 
-        EV<<"Send to the backup newjobqueue pop event "<<endl;
-        EV<<"NEW QUEUE NO LOAD "<<newJobsQueue.getLength()<<endl;
+        //EV<<"Send to the backup newjobqueue pop event "<<endl;
+        //EV<<"NEW QUEUE NO LOAD "<<newJobsQueue.getLength()<<endl;
         send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
-        msgSend=tmp->dup();
 
-        EV<<"IIInsert job queue in storage giben that no load balancing is performed"<<endl;
+        msgSend=tmp->dup();
+        //EV<<"IIInsert job queue in storage giben that no load balancing is performed"<<endl;
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
         //chi lo dice che sono idle?nisuno
@@ -513,10 +528,16 @@ void Executor::timeoutJobExecutionHandler(){
          scheduleAt(simTime()+timeoutEndActual,timeoutEndOfReRoutedExecution);
      }
 */
-    EV<<"Notify end of execution to storage"<<endl;
+    //EV<<"Notify end of execution to storage"<<endl;
     msgSend= msgServiced->dup();
-    msgSend->setJobQueue(true);
+    msgSend->setJobQueue(true);//dovrebbe essere implicito
     send(msgSend,"backup_send$o");
+
+
+    msgSend= msgServiced->dup();
+    msgSend->setCompletedQueue(true);//dovrebbe essere implicito
+    send(msgSend,"backup_send$o");
+
     completedJob.add(msgServiced);//also in original exec add it
 
 

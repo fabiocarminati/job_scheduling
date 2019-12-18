@@ -13,9 +13,10 @@ private:
     std::map<std::string, msg_check *> newJobsQueue;
     std::map<std::string, msg_check *> jobQueue;
     std::map<std::string, msg_check *> reRoutedQueue;
+    std::map<std::string, msg_check *> completedJobQueue;
 
     void searchMessage(std::string jobId,  msg_check *msg, std::map<std::string, msg_check *> *storedMap);
-    void executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap );
+    void executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap,bool jobFlag,bool newJobFlag,bool reRoutedFlag,bool completedFlag);
 
 
 
@@ -45,8 +46,8 @@ Storage::~Storage()
  This class represents a secure storage(his content will never be lost).
  There is one secure storage for each executor,
  Is useful because is the place where we put
-     ->The map function newJobsQueue that contains all the messages(msg_check) arrived to an executor that has not already either processed or
-     queued them or forwarded them to other executors due to load balancing
+     ->The map function newJobsQueue that contains all the messages(msg_check) arrived to an executor that has not
+     already either processed or queued them or forwarded them to other executors due to load balancing
      ->The map function jobQueue that contains all the messages waiting to be processed by that executor
  */
 void Storage::initialize() {
@@ -66,11 +67,14 @@ void Storage::handleMessage(cMessage *cmsg) {
    if(msg->getReBoot()==true){
        EV<<"the failure of executor "<<msg->getOriginalExecId()<<" is detected by the storage"<<endl;
 
-       executorReboot(jobId,msg,&jobQueue);
+       executorReboot(jobId,msg,&jobQueue,true,false,false,false);
 
-       executorReboot(jobId,msg,&newJobsQueue);
+       executorReboot(jobId,msg,&newJobsQueue,false,true,false,false);
 
-       executorReboot(jobId,msg,&reRoutedQueue);
+       executorReboot(jobId,msg,&reRoutedQueue,false,false,true,false);
+
+       executorReboot(jobId,msg,&completedJobQueue,false,false,false,true);
+
        msgBackup = new msg_check("End recover backup");
        msgBackup->setBackupComplete(true);
        msgBackup->setReBoot(true);
@@ -79,21 +83,27 @@ void Storage::handleMessage(cMessage *cmsg) {
 
 
    }else if(msg->getNewJobsQueue()==true){
-       searchMessage(jobId,msg,&newJobsQueue);
-       EV<<"working on NEWJOB map for: "<<jobId<<endl;
-
-   }else if(msg->getJobQueue()==true){
-       searchMessage(jobId,msg,&jobQueue);
-       EV<<"working on JOBID map for: "<<jobId<<endl;
-   }else if(msg->getReRoutedJobQueue()==true){
-       searchMessage(jobId,msg,&reRoutedQueue);
-       EV<<"working on REROUTED map for: "<<jobId<<endl;
-   }
+           msg->setNewJobsQueue(true);
+           searchMessage(jobId,msg,&newJobsQueue);
+           EV<<"working on NEWJOB map for: "<<jobId<<endl;
+         }else if(msg->getJobQueue()==true){
+                   msg->setJobQueue(true);
+                   searchMessage(jobId,msg,&jobQueue);
+                   EV<<"working on JOBID map for: "<<jobId<<endl;
+                }else if(msg->getReRoutedJobQueue()==true){
+                           msg->setReRoutedJobQueue(true);
+                           searchMessage(jobId,msg,&reRoutedQueue);
+                           EV<<"working on REROUTED map for: "<<jobId<<endl;
+                       }else if(msg->getCompletedQueue()==true){
+                                   msg->setCompletedQueue(true);
+                                   searchMessage(jobId,msg,&completedJobQueue);
+                                   EV<<"working on ENDED JOBS map for: "<<jobId<<endl;
+           }
 
    delete msg;
 }
 
-void Storage::executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap ){
+void Storage::executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap,bool jobFlag,bool newJobFlag,bool reRoutedFlag,bool completedFlag){
 
     msg_check *msgBackup;
     std::map<std::string, msg_check *>::iterator search;
@@ -101,10 +111,14 @@ void Storage::executorReboot(std::string jobId, msg_check *msg,std::map<std::str
     for (search = storedMap->begin();search != storedMap->end(); ++search){
         msgBackup=search->second->dup();
         msgBackup->setName("send backup copy");
+        msgBackup->setJobQueue(jobFlag);
+        msgBackup->setNewJobsQueue(newJobFlag);
+        msgBackup->setReRoutedJobQueue(reRoutedFlag);
+        msgBackup->setCompletedQueue(completedFlag);
         msgBackup->setReBoot(true);
 
+        EV<<"RE "<<msgBackup->getReRouted()<<" JOB "<<msgBackup->getJobQueue()<<" NEW "<<msgBackup->getNewJobsQueue()<<" ENDED "<<msgBackup->getCompletedQueue()<<" job id "<<jobId<<endl;
         send(msgBackup,"backup_rec$o");
-        EV<<"send the backup copy for "<<jobId<<endl;
     }
 }
 void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::string, msg_check *> *storedMap){
@@ -116,7 +130,7 @@ void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::str
         delete search->second;
         storedMap->erase(jobId);
 
-        EV<<"Erase "<<jobId<<"from storage"<<endl;
+        EV<<"Erase "<<jobId<<" from storage"<<endl;
 
         //if the job has not ended the computation, re-insert it with the modified field
         if(msg->getReRouted()==true && msg->getHasEnded()==false){
@@ -129,6 +143,7 @@ void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::str
         //No job found, insert it has new job
         storedMap->insert(std::pair<std::string ,msg_check *>(jobId, msg->dup()));
         EV<<"New element with ID "<<jobId<< " added in the secure storage in the map "<<endl;
+        EV<<"RE "<<msg->getReRouted()<<" JOB "<<msg->getJobQueue()<<" NEW "<<msg->getNewJobsQueue()<<" ENDED "<<msg->getCompletedQueue()<<" job id "<<jobId<<endl;
     }
 
 

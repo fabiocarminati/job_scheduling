@@ -40,6 +40,7 @@
  *     bool JobQueue;
  *     bool ReRoutedJobQueue;
  *     bool BackupComplete;
+ *     bool CompletedQueue;
  * }
  * </pre>
  */
@@ -63,6 +64,7 @@ class msg_check : public ::omnetpp::cPacket
     bool JobQueue;
     bool ReRoutedJobQueue;
     bool BackupComplete;
+    bool CompletedQueue;
 
   private:
     void copy(const msg_check& other);
@@ -115,6 +117,8 @@ class msg_check : public ::omnetpp::cPacket
     virtual void setReRoutedJobQueue(bool ReRoutedJobQueue);
     virtual bool getBackupComplete() const;
     virtual void setBackupComplete(bool BackupComplete);
+    virtual bool getCompletedQueue() const;
+    virtual void setCompletedQueue(bool CompletedQueue);
 };
 
 inline void doParsimPacking(omnetpp::cCommBuffer *b, const msg_check& obj) {obj.parsimPack(b);}
