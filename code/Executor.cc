@@ -201,6 +201,7 @@ void Executor::rePopulateQueues(msg_check *msg){
                                   EV<<"BACKUP in completed jobs"<<endl;
 
                            }
+        delete msg;
     }
     else{
         EV<<"The backup process is over, executor is now in normal execution mode"<<endl<<".........."<<endl;

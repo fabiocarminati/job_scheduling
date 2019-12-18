@@ -117,7 +117,7 @@ void Storage::executorReboot(std::string jobId, msg_check *msg,std::map<std::str
         msgBackup->setCompletedQueue(completedFlag);
         msgBackup->setReBoot(true);
 
-        EV<<"RE "<<msgBackup->getReRouted()<<" JOB "<<msgBackup->getJobQueue()<<" NEW "<<msgBackup->getNewJobsQueue()<<" ENDED "<<msgBackup->getCompletedQueue()<<" job id "<<jobId<<endl;
+        EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
         send(msgBackup,"backup_rec$o");
     }
 }
@@ -143,7 +143,7 @@ void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::str
         //No job found, insert it has new job
         storedMap->insert(std::pair<std::string ,msg_check *>(jobId, msg->dup()));
         EV<<"New element with ID "<<jobId<< " added in the secure storage in the map "<<endl;
-        EV<<"RE "<<msg->getReRouted()<<" JOB "<<msg->getJobQueue()<<" NEW "<<msg->getNewJobsQueue()<<" ENDED "<<msg->getCompletedQueue()<<" job id "<<jobId<<endl;
+        EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
     }
 
 
