@@ -72,6 +72,7 @@ Executor::~Executor()
 void Executor::initialize() {
     probingMode = false;
     myId=getId()-2-N;
+    EV<<myId<<endl;
     nArrived=0;
     E = par("E"); //non volatile parameters --once defined they never change
     N= par("N");
