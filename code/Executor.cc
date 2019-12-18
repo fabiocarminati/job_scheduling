@@ -115,22 +115,23 @@ void Executor::handleMessage(cMessage *cmsg) {
             msgSend->setReBoot(true);
             msgSend->setActualExecId(myId);
             msgSend->setOriginalExecId(myId);
-            EV<<"Reboot of the executor starts"<<endl;
+            EV<<"Reboot phase starts"<<endl<<"....."<<endl;
             send(msgSend,"backup_send$o");
-            failure=false;
+
        }
-       else
-         //delete msg;
-         return;
+       else if(!msg->isSelfMessage() && msg->getReBoot()==true){
+                           // EV<<"RE "<<msg->getReRouted()<<" JOB "<<msg->getJobQueue()<<" NEW "<<msg->getNewJobsQueue()<<endl;
+                rePopulateQueues(msg);
+                delete(msg);
+             }
+           else{
+               EV<<"The executor is not in normal mode and this is not a msg coming from the backup:ignore it"<<endl;
+               return;
+           }
    }
    else if(msg->isSelfMessage()){
                selfMessage(msg);
-         }else if(msg->getReBoot()==true){
-                    // EV<<"RE "<<msg->getReRouted()<<" JOB "<<msg->getJobQueue()<<" NEW "<<msg->getNewJobsQueue()<<endl;
-
-                     rePopulateQueues(msg);
-                     delete(msg);
-                 }else if(msg->getNewJob()==true){
+         }else if(msg->getNewJob()==true){
                            newJob(msg);
                        }else if(msg->getProbing()==true){
                                  probeHandler(msg);
@@ -166,12 +167,12 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
      cancelEvent(timeoutEndOfReRoutedExecution);
      cancelEvent(timeoutFailureEnd);
      scheduleAt(simTime()+timeoutFailure, timeoutFailureEnd);
-     EV<<"A failure has happened"<<endl;
+     EV<<"A failure has happened:start failure phase "<<"......"<<endl;
 
    }
  }
- else
-         EV<<"Due to Failure message is lost "<<endl;
+ //else
+        // EV<<"Due to Failure message is lost "<<endl;
 
 }
 
@@ -196,6 +197,7 @@ void Executor::rePopulateQueues(msg_check *msg){
     }
     else{
         EV<<"The backup process is over, executor is now in normal execution mode"<<endl<<".........."<<endl;
+        failure=false;//until I have recovered all the backup message I will still ignore all the other messages
         restartNormalMode();
     }
 }
