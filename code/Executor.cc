@@ -41,6 +41,7 @@ private:
     void timeoutJobExecutionHandler();
     void failureEvent(msg_check *msg,double probEvent);
     void rePopulateQueues(msg_check *msg);
+    void restartNormalMode();
 protected:
     virtual void initialize();// override;
     virtual void handleMessage(cMessage *cmsg);// override;
@@ -71,11 +72,12 @@ Executor::~Executor()
 
 void Executor::initialize() {
     probingMode = false;
+    N= par("N");
+    E = par("E"); //non volatile parameters --once defined they never change
     myId=getId()-2-N;
     EV<<myId<<endl;
     nArrived=0;
-    E = par("E"); //non volatile parameters --once defined they never change
-    N= par("N");
+
     probEvent=par("probEvent");
     failure=false;
  // The exponential value is computed in the handleMessage; Set the service time as exponential
@@ -110,22 +112,9 @@ void Executor::handleMessage(cMessage *cmsg) {
    if(failure){
        if(msg==timeoutFailureEnd) {
             msgSend = new msg_check("Failure end");
-            msgSend->setReBoot(true); //problema:poi rientro in selfEvents
-            //msgSend->setHasEnded(false);
-            //msgSend->setProbing(false);
-            //msgSend->setJobComplexity(0.2); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
-            //msgSend->setRelativeJobId(0); //will be useful for computing the per class extended service time
-           // msgSend->setClientId(-1);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
+            msgSend->setReBoot(true);
             msgSend->setActualExecId(myId);
             msgSend->setOriginalExecId(myId);
-           // msgSend->setQueueLength(0);
-            /*msgSend->setReRouted(false);
-            msgSend->setAck(false);
-            msgSend->setNewJob(false);
-            msgSend->setReBoot(false);
-            msgSend->setJobQueue(false);
-            msgSend->setNewJobsQueue(false);
-            msgSend->setReRoutedJobQueue(false);*/
             EV<<"Reboot of the executor starts"<<endl;
             send(msgSend,"backup_send$o");
             failure=false;
@@ -137,7 +126,10 @@ void Executor::handleMessage(cMessage *cmsg) {
    else if(msg->isSelfMessage()){
                selfMessage(msg);
          }else if(msg->getReBoot()==true){
+                    // EV<<"RE "<<msg->getReRouted()<<" JOB "<<msg->getJobQueue()<<" NEW "<<msg->getNewJobsQueue()<<endl;
+
                      rePopulateQueues(msg);
+                     delete(msg);
                  }else if(msg->getNewJob()==true){
                            newJob(msg);
                        }else if(msg->getProbing()==true){
@@ -151,22 +143,7 @@ void Executor::handleMessage(cMessage *cmsg) {
        //delete msg;
 
 }
-void Executor::rePopulateQueues(msg_check *msg){
-    if(msg->getNewJobsQueue()==true){
-        newJobsQueue.insert(msg->dup());
-        balancedJob(msg);
-    }else if(msg->getJobQueue()==true){
-          if(msg->getReRouted()==true)
-              jobQueue.insert(msg->dup());
-          else{
-              newJobsQueue.insert(msg->dup());
-              balancedJob(msg);
-          }
-    }else if(msg->getReRoutedJobQueue()==true){
-              reRoutedJobs.add(msg->dup());
-    }
 
-}
 
 void Executor::failureEvent(msg_check *msg,double probEvent){
     msg_check *msgSend;
@@ -183,12 +160,11 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
      probingMode = false;//if probingMode = true means that i am waiting for responses by other executors but if I fail I stop also the timeout
      //thus I will never be able in the future to do probing becauset probingMode=true forever
 
-     //EV<<"ERASE NEW "<<newJobsQueue.getLength()<<" JOB "<<jobQueue.getLength()<<" BALANCED "<<balanceResponses.getLength()<<" RE ROUTED "<<reRoutedJobs.size();
      cancelEvent(timeoutReRouted);
      cancelEvent(timeoutJobComputation);
      cancelEvent(timeoutLoadBalancing);
      cancelEvent(timeoutEndOfReRoutedExecution);
-     //cancelEvent(timeoutFailureEnd);
+     cancelEvent(timeoutFailureEnd);
      scheduleAt(simTime()+timeoutFailure, timeoutFailureEnd);
      EV<<"A failure has happened"<<endl;
 
@@ -196,6 +172,56 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
  }
  else
          EV<<"Due to Failure message is lost "<<endl;
+
+}
+
+void Executor::rePopulateQueues(msg_check *msg){
+    if(msg->getBackupComplete()==false){
+        if(msg->getNewJobsQueue()==true){
+            newJobsQueue.insert(msg->dup());
+            EV<<"BACKUP In the new_job_queue"<<endl;
+            //balancedJob(msg);
+        }else if(msg->getJobQueue()==true){
+                  if(msg->getReRouted()==true){
+                      jobQueue.insert(msg->dup());
+                      EV<<"BACKUP In the job_queue"<<endl;
+                  }else{
+                      newJobsQueue.insert(msg->dup());
+                      //balancedJob(msg);
+                  }
+              }else if(msg->getReRoutedJobQueue()==true){
+                      reRoutedJobs.add(msg->dup());
+                      EV<<"BACKUP In the rerouted_queue"<<endl;
+              }
+    }
+    else{
+        EV<<"The backup process is over, executor is now in normal execution mode"<<endl<<".........."<<endl;
+        restartNormalMode();
+    }
+}
+
+void Executor::restartNormalMode(){
+    msg_check *msgServiced,*tmp;
+    simtime_t timeoutJobComplexity;
+    int jobId,portId;
+    if(jobQueue.isEmpty()){
+        if(newJobsQueue.isEmpty())
+            EV<<"JOB and NEWJOB queue are idle, the machine goes IDLE"<<endl;
+        else{
+            tmp = check_and_cast<msg_check *>(newJobsQueue.front());
+            balancedJob(tmp);
+        }
+    }
+    else{
+         msgServiced = check_and_cast<msg_check *>(jobQueue.front());
+         jobId = msgServiced->getRelativeJobId();
+         portId = msgServiced->getClientId()-1;
+         if(!timeoutJobComputation->isScheduled()){
+             timeoutJobComplexity = msgServiced->getJobComplexity();
+             scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
+             EV<<"Starting service of "<<jobId<<" coming from user ID "<<portId<<" from the queue of the machine "<<msgServiced->getOriginalExecId()<<endl;
+         }
+    }
 
 }
 
@@ -512,6 +538,7 @@ void Executor::timeoutJobExecutionHandler(){
     }
 
 }
+
 
 //called in the self message function
 
