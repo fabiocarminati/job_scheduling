@@ -131,13 +131,6 @@ void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::str
         storedMap->erase(jobId);
 
         EV<<"Erase "<<jobId<<" from storage"<<endl;
-
-        //if the job has not ended the computation, re-insert it with the modified field
-        if(msg->getReRouted()==true && msg->getHasEnded()==false){
-            storedMap->insert(std::pair<std::string ,msg_check *>(jobId, msg->dup()));
-            EV<<"Due to load balancing a change in the machine is performed for "<<jobId<< " and this is notified to the secure storage "<<endl;
-            EV<<"Original  "<<msg->getOriginalExecId()<<" and new actual "<<msg->getActualExecId()<<endl;
-        }
     }
     else{
         //No job found, insert it has new job

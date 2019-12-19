@@ -131,7 +131,8 @@ void Executor::handleMessage(cMessage *cmsg) {
    }
    else if(msg->isSelfMessage()){
                selfMessage(msg);
-         }else if(msg->getNewJob()==true){
+         }else{
+             if(msg->getNewJob()==true){
                            newJob(msg);
                        }else if(msg->getProbing()==true){
                                  probeHandler(msg);
@@ -141,7 +142,8 @@ void Executor::handleMessage(cMessage *cmsg) {
                                              reRoutedHandler(msg);
                                          }
 
-       //delete msg;
+             delete msg;
+         }
 
 }
 
@@ -150,9 +152,8 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
     msg_check *msgSend;
  if(!failure)
  {
-   if(uniform(0,1)<probEvent)
+   if(uniform(0,1)<probEvent){
      failure=true;
-   if(failure){
      //outGoingPacket.clear();
      newJobsQueue.clear();
      jobQueue.clear();
@@ -169,7 +170,6 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
      cancelEvent(timeoutFailureEnd);
      scheduleAt(simTime()+timeoutFailure, timeoutFailureEnd);
      EV<<"A failure has happened:start failure phase "<<"......"<<endl;
-
    }
  }
  //else
@@ -263,9 +263,7 @@ void Executor::balancedJob(msg_check *msg){
          //TO DO:ADD ONE TIMEOUT FOR ALL
         }
         probingMode = true;
-        if(!timeoutLoadBalancing->isScheduled()){
-            scheduleAt(simTime()+timeoutLoad, timeoutLoadBalancing);
-        }
+        scheduleAt(simTime()+timeoutLoad, timeoutLoadBalancing);
     }
 }
 
@@ -334,8 +332,6 @@ void Executor::reRoutedHandler(msg_check *msg){
         send(msgSend,"backup_send$o");
 
         reRoutedJobs.add(tmp);
-
-        probingMode = false;
         if(newJobsQueue.getLength()>0){
             tmp = check_and_cast<msg_check *>(newJobsQueue.front());
             balancedJob(tmp);
@@ -398,14 +394,12 @@ void Executor::newJob(msg_check *msg){
     id=jobId.c_str();
     //save the message to the stable storage
     msg->setRelativeJobId(nArrived);
-    msgSend=msg->dup();
-
 
     //Reply to the client
     port_id=msg->getClientId()-1;
     msgSend=msg->dup();
     msgSend->setAck(true);
-    send(msgSend->dup(),"exec$o",port_id);
+    send(msgSend,"exec$o",port_id);
     EV<<"First time the packet is in the cluster:define his "<<id<<endl;
     msg->setNewJob(false);
 
