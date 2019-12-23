@@ -327,8 +327,9 @@ void Executor::reRoutedHandler(msg_check *msg){
         send(msgSend,"backup_send$o");
         actualExecId = msg->getActualExecId();
         tmp->setActualExecId(actualExecId);
+
+        tmp->setReRoutedJobQueue(true);
         msgSend=tmp->dup();
-        msgSend->setReRoutedJobQueue(true);
         //EV<<"Send to the backup reroutedjobqueue add event "<<endl;
         send(msgSend,"backup_send$o");
         reRoutedJobs.add(tmp);
@@ -357,11 +358,13 @@ void Executor::statusRequestHandler(msg_check *msg){
                               &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
                           reRoutedJobs.remove(i);
                           EV << "Erasing from the rerouted jobs the job: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+                          send(tmp->dup(),"backup_send$o");//notify erase in rerouted job queue to the storage
                       }
                  }
                  portId = msg->getActualExecId();
                  tmp = msg->dup();
                  tmp->setReRouted(false);
+                 //EV<<"send remove rerouted after STATUS REQUEST"<<endl;
                  send(tmp,"load_send",portId);
              }
              portId = msg->getClientId()-1;
@@ -369,14 +372,16 @@ void Executor::statusRequestHandler(msg_check *msg){
              tmp->setReRouted(false);
              send(tmp,"exec$o",portId);
          }
-      }else{
+      }else{//because the client will reply to the status reply
           if(msg->getIsEnded()){
               for(i=0;i<completedJob.size();i++){
                    tmp = check_and_cast<msg_check *>(completedJob[i]);
                    if(tmp->getOriginalExecId()==msg->getOriginalExecId()
                            &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
                        completedJob.remove(i);
-                       EV << "Erasing from the completed job queue: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+                       EV << "Erasing in executor from the completed job queue: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+
+                       send(tmp->dup(),"backup_send$o");//notify erase in completed job queue to the storage
                    }
               }
           }
@@ -395,7 +400,7 @@ void Executor::statusRequestHandler(msg_check *msg){
                 msgEnded->setIsEnded(true);
             }
         }
-        if(msg->getReRouted()==true){
+        if(msg->getReRouted()==true){ //the actual exec has received the forwarded status request froom the original exec
             if(found){
                 tmp = msgEnded;
             }else{
@@ -430,7 +435,7 @@ void Executor::statusRequestHandler(msg_check *msg){
                     send(tmp,"load_send",portId);
                     EV << "Asking the status to actual exec: "<<tmp->getOriginalExecId() <<"-"<<tmp->getRelativeJobId()
                             <<"to "<<tmp->getActualExecId()<<endl;
-                }else{
+                }else{//original exec non ha fatto rerouted;il pkt si trova o in jobqueue o in newjobqueue
                     tmp = msg->dup();
                     tmp->setStatusRequest(true);
                     tmp->setAck(true);
@@ -582,6 +587,7 @@ void Executor::timeoutJobExecutionHandler(){
     portId = msgServiced->getClientId()-1;  //Source id-1=portId
     EV<<"Completed service of "<<originalExecutor<<"with ID: "<<jobId<<" creating by the user ID "<<portId<<endl;
     msgServiced->setStatusRequest(true);
+    msgServiced->setCompletedQueue(true);
     /*if(msgServiced->getReRouted()==true){
          msgSend= msgServiced->dup();
          send(msgSend,"load_send",msgSend->getOriginalExecId());
@@ -595,7 +601,7 @@ void Executor::timeoutJobExecutionHandler(){
 
 
     msgSend= msgServiced->dup();
-    msgSend->setCompletedQueue(true);//dovrebbe essere implicito
+
     send(msgSend,"backup_send$o");
 
     completedJob.add(msgServiced);//also in original exec add it
