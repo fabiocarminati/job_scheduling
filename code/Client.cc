@@ -65,7 +65,7 @@ void Client::handleMessage(cMessage *cmsg) {
     // Casting from cMessage to msg_check
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
     std::string jobId;
-
+    std::map<std::string, msg_check *>::iterator search;
     jobId.append(std::to_string(msg->getOriginalExecId()));
     jobId.append("-");
     jobId.append(std::to_string(msg->getRelativeJobId()));
@@ -118,11 +118,16 @@ void Client::handleMessage(cMessage *cmsg) {
                 if(msg->getAck()==true){
                     if(msg->getIsEnded()==true){
                         EV<<"Completed: "<<jobId<<endl;
+                        destinationPort = msg->getOriginalExecId();
+                        send(msg->dup(),"user$o",destinationPort);
 
                         //delete the job from the list of the job currently in processing
                         workInProgress.erase(jobId);
-                        destinationPort = msg->getOriginalExecId();
-                        send(msg->dup(),"user$o",destinationPort);
+                        search=workInProgress.find(jobId);
+                         if (search != workInProgress.end()){
+                             delete search->second;
+                             workInProgress.erase(jobId);
+                         }
                     }
                     else{
                         EV<<"Not completed: "<<msg->getOriginalExecId()<<"-"<<msg->getRelativeJobId()<<endl;

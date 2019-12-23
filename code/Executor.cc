@@ -25,7 +25,7 @@ private:
     double probEvent;
     bool probingMode,failure;
 
-    cArray completedJob;
+    std::map<std::string,msg_check *> completedJob;
     cQueue newJobsQueue;
     cQueue jobQueue;
     cQueue balanceResponses;
@@ -137,7 +137,7 @@ void Executor::handleMessage(cMessage *cmsg) {
                        }else if(msg->getProbing()==true){
                                  probeHandler(msg);
                              }else if(msg->getStatusRequest()==true){
-                                       statusRequestHandler(msg);
+                                      statusRequestHandler(msg);
                                    }else if(msg->getReRouted()==true){
                                              reRoutedHandler(msg);
                                          }
@@ -150,6 +150,7 @@ void Executor::handleMessage(cMessage *cmsg) {
 
 void Executor::failureEvent(msg_check *msg,double probEvent){
     msg_check *msgSend;
+    std::map<std::string, msg_check *>::iterator search;
  if(!failure)
  {
    if(uniform(0,1)<probEvent){
@@ -159,7 +160,10 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
      jobQueue.clear();
      balanceResponses.clear();
      reRoutedJobs.clear();
-     completedJob.clear();
+     for (search = completedJob.begin();search != completedJob.end(); ++search){
+         delete search->second;
+         completedJob.erase(search->first);
+     }
      probingMode = false;//if probingMode = true means that i am waiting for responses by other executors but if I fail I stop also the timeout
      //thus I will never be able in the future to do probing becauset probingMode=true forever
 
@@ -178,6 +182,7 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
 }
 
 void Executor::rePopulateQueues(msg_check *msg){
+    std::string jobId;
     if(msg->getBackupComplete()==false){
         msg->setReBoot(false);
         if(msg->getNewJobsQueue()==true){
@@ -197,7 +202,10 @@ void Executor::rePopulateQueues(msg_check *msg){
                       reRoutedJobs.add(msg->dup());
                       EV<<"BACKUP In the rerouted_queue"<<endl;
                      }else if(msg->getCompletedQueue()==true){
-                                  completedJob.add(msg->dup());
+                                  jobId.append(std::to_string(msg->getOriginalExecId()));
+                                  jobId.append("-");
+                                  jobId.append(std::to_string(msg->getRelativeJobId()));
+                                  completedJob.insert(std::pair<std::string, msg_check *>(jobId,msg->dup()));
                                   EV<<"BACKUP in completed jobs"<<endl;
 
                            }
@@ -346,7 +354,12 @@ void Executor::reRoutedHandler(msg_check *msg){
 void Executor::statusRequestHandler(msg_check *msg){
     msg_check *tmp, *msgEnded;
     int portId, i;
-    bool found;
+    std::map<std::string, msg_check *>::iterator search;
+    std::string jobId;
+    bool found =false;
+    jobId.append(std::to_string(msg->getOriginalExecId()));
+    jobId.append("-");
+    jobId.append(std::to_string(msg->getRelativeJobId()));
     if(msg->getAck()==true){
       EV << "ACK received for "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
       if(msg->getReRouted()==true){
@@ -374,49 +387,46 @@ void Executor::statusRequestHandler(msg_check *msg){
          }
       }else{//because the client will reply to the status reply
           if(msg->getIsEnded()){
-              for(i=0;i<completedJob.size();i++){
-                   tmp = check_and_cast<msg_check *>(completedJob[i]);
-                   if(tmp->getOriginalExecId()==msg->getOriginalExecId()
-                           &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
-                       completedJob.remove(i);
-                       EV << "Erasing in executor from the completed job queue: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
-
-                       send(tmp->dup(),"backup_send$o");//notify erase in completed job queue to the storage
+                   search=completedJob.find(jobId);
+                   if (search != completedJob.end()){
+                       EV << "Erasing in executor from the completed job queue: "<<jobId<<endl;
+                       send(search->second->dup(),"backup_send$o");//notify erase in completed job queue to the storage
+                       delete search->second;
+                       completedJob.erase(jobId);
                    }
-              }
+                   else{
+                       EV << "FATAL ERROR: Erasing in executor from the completed job queue: "<<jobId<<endl;
+                   }
           }
       }
     }
     else{
-        found = false;
-        for(i=0;i<completedJob.size();i++){
-            tmp = check_and_cast<msg_check *>(completedJob[i]);
-            if(tmp->getOriginalExecId()==msg->getOriginalExecId()
-                    &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
-                found = true;
-                msgEnded = tmp->dup();
-                msgEnded->setStatusRequest(true);
-                msgEnded->setAck(true);
-                msgEnded->setIsEnded(true);
-            }
-        }
+        search=completedJob.find(jobId);
         if(msg->getReRouted()==true){ //the actual exec has received the forwarded status request froom the original exec
-            if(found){
-                tmp = msgEnded;
+            if(search != completedJob.end()){
+                tmp = search->second->dup();
+                tmp->setStatusRequest(true);
+                tmp->setAck(true);
+                tmp->setIsEnded(true);
             }else{
                   tmp = msg->dup();
                   tmp->setIsEnded(false);
                   tmp->setAck(true);
             }
-            EV << "Sending the status to original exec: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+            EV << "Sending the status to original exec: "<<jobId<<endl;
             portId = tmp->getOriginalExecId();
             send(tmp,"load_send",portId);
         }else{
-            if(found){
-                EV<<"Found JobId in my completed jobs(original): "<<msgEnded->getOriginalExecId()<<"   "<<msgEnded->getActualExecId()<<endl;
-                portId=msgEnded->getClientId()-1;
-                send(msgEnded,"exec$o",portId);
+            if(search != completedJob.end()){
+                tmp = search->second->dup();
+                tmp->setStatusRequest(true);
+                tmp->setAck(true);
+                tmp->setIsEnded(true);
+                EV<<"Found JobId in my completed jobs(original): "<<jobId<<endl;
+                portId=tmp->getClientId()-1;
+                send(tmp,"exec$o",portId);
             }else{
+                found = false;
                 for(i=0;i<reRoutedJobs.size();i++){
                     tmp = check_and_cast<msg_check *>(reRoutedJobs[i]);
                     if(tmp->getOriginalExecId()==msg->getOriginalExecId()
@@ -574,19 +584,18 @@ void Executor::timeoutLoadBalancingHandler(){
 }
 
 void Executor::timeoutJobExecutionHandler(){
-    int jobId;
+    std::string jobId;
     int portId;
-    int originalExecutor;
     simtime_t timeoutJobComplexity;
     msg_check *msgServiced,*msgSend;
     // Get the source_id of the message that just finished service
 
     msgServiced = check_and_cast<msg_check *>(jobQueue.pop());
-    originalExecutor = msgServiced->getOriginalExecId();
-    jobId = msgServiced->getRelativeJobId();
+    jobId.append(std::to_string(msgServiced->getOriginalExecId()));
+    jobId.append("-");
+    jobId.append(std::to_string(msgServiced->getRelativeJobId()));
     portId = msgServiced->getClientId()-1;  //Source id-1=portId
-    EV<<"Completed service of "<<originalExecutor<<"with ID: "<<jobId<<" creating by the user ID "<<portId<<endl;
-    msgServiced->setStatusRequest(true);
+    EV<<"Completed job: "<<jobId<<" creating by the user ID "<<portId<<endl;
     msgServiced->setCompletedQueue(true);
     /*if(msgServiced->getReRouted()==true){
          msgSend= msgServiced->dup();
@@ -604,7 +613,7 @@ void Executor::timeoutJobExecutionHandler(){
 
     send(msgSend,"backup_send$o");
 
-    completedJob.add(msgServiced);//also in original exec add it
+    completedJob.insert(std::pair<std::string, msg_check *>(jobId,msgServiced));//also in original exec add it
 
 
 
@@ -615,15 +624,16 @@ void Executor::timeoutJobExecutionHandler(){
       ->If the queue is not empty:takes the first packet in the queue(FIFO approach) and starts to execute it
      */
     if(jobQueue.isEmpty())
-      EV<<"Empty queue, the machine "<<msgServiced->getActualExecId()<<" goes IDLE"<<endl;
+      EV<<"Empty queue, the machine "<<myId<<" goes IDLE"<<endl;
     else{
          msgServiced = check_and_cast<msg_check *>(jobQueue.front());
-         originalExecutor = msgServiced->getOriginalExecId();
-         jobId = msgServiced->getRelativeJobId();
+         jobId.append(std::to_string(msgServiced->getOriginalExecId()));
+         jobId.append("-");
+         jobId.append(std::to_string(msgServiced->getRelativeJobId()));
          portId = msgServiced->getClientId()-1;
          timeoutJobComplexity = msgServiced->getJobComplexity();
          scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
-         EV<<"Starting service of "<<jobId<<" coming from user ID "<<portId<<" from the queue of the machine "<<originalExecutor<<endl;
+         EV<<"Starting job"<<jobId<<" coming from user ID "<<portId<<endl;
     }
 
 }
