@@ -35,7 +35,7 @@ private:
     void newJob(msg_check *msg);
     void balancedJob(msg_check *msg);
     void probeHandler(msg_check *msg);
-   // void ReRoutedJobEnd(msg_check *msg);
+    void statusRequestHandler(msg_check *msg);
     void reRoutedHandler(msg_check *msg);
     void timeoutLoadBalancingHandler();
     void timeoutJobExecutionHandler();
@@ -75,7 +75,7 @@ void Executor::initialize() {
     N= par("N");
     E = par("E"); //non volatile parameters --once defined they never change
     myId=getId()-2-N;
-   // EV<<myId<<endl;
+    //EV<<myId<<endl;
     nArrived=0;
 
     probEvent=par("probEvent");
@@ -108,7 +108,7 @@ void Executor::handleMessage(cMessage *cmsg) {
    const char * id,* job_id;
    int machine;
 
-   failureEvent(msg,probEvent);
+   //failureEvent(msg,probEvent);
    if(failure){
        if(msg==timeoutFailureEnd) {
             msgSend = new msg_check("Failure end");
@@ -136,9 +136,9 @@ void Executor::handleMessage(cMessage *cmsg) {
                            newJob(msg);
                        }else if(msg->getProbing()==true){
                                  probeHandler(msg);
-                             /*}else if(msg->getHasEnded()==true){
-                                       ReRoutedJobEnd(msg);
-                                   */}else if(msg->getReRouted()==true){
+                             }else if(msg->getStatusRequest()==true){
+                                       statusRequestHandler(msg);
+                                   }else if(msg->getReRouted()==true){
                                              reRoutedHandler(msg);
                                          }
 
@@ -248,7 +248,7 @@ void Executor::balancedJob(msg_check *msg){
     src_id=msg->getClientId();
     EV<<"msg ID "<<msg->getRelativeJobId()<<" coming from user ID "<<src_id-1<<" trying to distribute"<<endl;
     if(!probingMode){  //==-1 means that the coming msg has been forwarded by another machine after load balancing
-        msg->setHasEnded(false);
+        msg->setStatusRequest(false);
         msg->setProbing(true);
         msg->setAck(false);
         msg->setReRouted(false);
@@ -274,7 +274,7 @@ void Executor::probeHandler(msg_check *msg){
         //an arrival comes in 3
         msgSend = msg->dup();
         msgSend->setAck(true);
-        msgSend->setHasEnded(false);  //set message priority
+        msgSend->setStatusRequest(false);  //set message priority
         msgSend->setProbing(true);
         msgSend->setReRouted(false);
         EV<<"The machine "<<msgSend->getOriginalExecId()<<" has a queue "<<msgSend->getQueueLength()<<" than the one in this machine which has queue length="<<jobQueue.getLength()<<endl;
@@ -294,13 +294,14 @@ void Executor::probeHandler(msg_check *msg){
 
 void Executor::reRoutedHandler(msg_check *msg){
     msg_check *msgSend,*tmp;
+    int actualExecId;
     simtime_t timeoutJobComplexity;
     if(msg->getAck()==false)  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
         //NO IS WRONG THIS THINKING+1 is needed in order to avoid ping pong:exe machine 5 has queue length =3 while machine 1 has length  =2... without +1 5-2 and 1-3 but if a
         //an arrival comes in 3
         msgSend = msg->dup();
         msgSend->setAck(true);
-        msgSend->setHasEnded(false);  //set message priority
+        msgSend->setStatusRequest(false);  //set message priority
         msgSend->setProbing(false);
         msgSend->setReRouted(true);
         send(msgSend,"load_send",msgSend->getOriginalExecId());
@@ -324,60 +325,124 @@ void Executor::reRoutedHandler(msg_check *msg){
         msgSend->setNewJobsQueue(true);
         //EV<<"Send to the backup newjobqueue pop event "<<endl;
         send(msgSend,"backup_send$o");
-
-
+        actualExecId = msg->getActualExecId();
+        tmp->setActualExecId(actualExecId);
         msgSend=tmp->dup();
         msgSend->setReRoutedJobQueue(true);
         //EV<<"Send to the backup reroutedjobqueue add event "<<endl;
         send(msgSend,"backup_send$o");
-
         reRoutedJobs.add(tmp);
         if(newJobsQueue.getLength()>0){
             tmp = check_and_cast<msg_check *>(newJobsQueue.front());
             balancedJob(tmp);
         }
+        //TO  Check: filippo
         cancelEvent(timeoutReRouted);
-        EV<<"ack received from actual exec "<< msg->getActualExecId()<<endl;
+        EV<<"ack received from actual exec "<< actualExecId <<endl;
     }
 }
 
-/*void Executor::ReRoutedJobEnd(msg_check *msg){
-    When the actual exec receives that ACK:
-               ->It will stop the timeout event timeoutReSendOriginal for the ACK
-               ->Notify his secure storage to delete the local copy of the previously processed packet
-
-    msg_check *ackToActualExec;
+void Executor::statusRequestHandler(msg_check *msg){
+    msg_check *tmp, *msgEnded;
+    int portId, i;
+    bool found;
     if(msg->getAck()==true){
-      EV << "ACK received from original exec "<<msg->getOriginalExecId() <<" for "<<msg->getRelativeJobId()<<endl;
-      ackToActualExec=msg->dup();
-      send(ackToActualExec, "backup_send$o");
-      //cancelEvent(timeoutEndOfReRoutedExecution);
-
+      EV << "ACK received for "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+      if(msg->getReRouted()==true){
+         if(msg->getOriginalExecId()==myId){
+             if(msg->getIsEnded()){
+                 for(i=0;i<reRoutedJobs.size();i++){
+                      tmp = check_and_cast<msg_check *>(reRoutedJobs[i]);
+                      if(tmp->getOriginalExecId()==msg->getOriginalExecId()
+                              &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
+                          reRoutedJobs.remove(i);
+                          EV << "Erasing from the rerouted jobs the job: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+                      }
+                 }
+                 portId = msg->getActualExecId();
+                 tmp = msg->dup();
+                 tmp->setReRouted(false);
+                 send(tmp,"load_send",portId);
+             }
+             portId = msg->getClientId()-1;
+             tmp = msg->dup();
+             tmp->setReRouted(false);
+             send(tmp,"exec$o",portId);
+         }
+      }else{
+          if(msg->getIsEnded()){
+              for(i=0;i<completedJob.size();i++){
+                   tmp = check_and_cast<msg_check *>(completedJob[i]);
+                   if(tmp->getOriginalExecId()==msg->getOriginalExecId()
+                           &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
+                       completedJob.remove(i);
+                       EV << "Erasing from the completed job queue: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+                   }
+              }
+          }
+      }
     }
     else{
-        When the original exec receives the msg notifying the end of processing by actual exec:
-              ->Sends the ACK to the actual exec
-              ->Notifies his secure storage to delete the local copy of the previously forwarded packet to the actual exec
-              ->Notifies the client the end of the processing
-
-        EV << "Send the ACK to the actual exec "<<msg->getActualExecId() <<" for "<<msg->getRelativeJobId()<<endl;
-        ackToActualExec=msg->dup();
-        ackToActualExec->setAck(true);
-        send(ackToActualExec, "load_send",ackToActualExec->getActualExecId());
-        ackToActualExec=msg->dup();
-        send(ackToActualExec, "backup_send$o"); //the original exec notifies his own storage to delete the entry
-        ackToActualExec=msg->dup();
-        completedJob.add(ackToActualExec);
-        EV<<"Original exec add the forwarded job to his COMPLETEDJOB QUEUE after sending the ack"<<endl;
-        //per ora non voglio che executor dica al client end of execution se non e lui a chiederlo
-        //ackToActualExec=msg->dup();
-       // send(ackToActualExec, "exec$o",msg->getClientId()-1);
-        //timeout has been removed:to add,remove from rerouted jobs
-
+        found = false;
+        for(i=0;i<completedJob.size();i++){
+            tmp = check_and_cast<msg_check *>(completedJob[i]);
+            if(tmp->getOriginalExecId()==msg->getOriginalExecId()
+                    &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
+                found = true;
+                msgEnded = tmp->dup();
+                msgEnded->setStatusRequest(true);
+                msgEnded->setAck(true);
+                msgEnded->setIsEnded(true);
+            }
+        }
+        if(msg->getReRouted()==true){
+            if(found){
+                tmp = msgEnded;
+            }else{
+                  tmp = msg->dup();
+                  tmp->setIsEnded(false);
+                  tmp->setAck(true);
+            }
+            EV << "Sending the status to original exec: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+            portId = tmp->getOriginalExecId();
+            send(tmp,"load_send",portId);
+        }else{
+            if(found){
+                EV<<"Found JobId in my completed jobs(original): "<<msgEnded->getOriginalExecId()<<"   "<<msgEnded->getActualExecId()<<endl;
+                portId=msgEnded->getClientId()-1;
+                send(msgEnded,"exec$o",portId);
+            }else{
+                for(i=0;i<reRoutedJobs.size();i++){
+                    tmp = check_and_cast<msg_check *>(reRoutedJobs[i]);
+                    if(tmp->getOriginalExecId()==msg->getOriginalExecId()
+                            &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
+                        found = true;
+                        msgEnded = tmp;
+                    }
+                }
+                if(found){
+                    tmp = msgEnded->dup();
+                    tmp->setStatusRequest(true);
+                    tmp->setAck(false);
+                    tmp->setReRouted(true);
+                    tmp->setIsEnded(false);
+                    portId=tmp->getActualExecId();
+                    send(tmp,"load_send",portId);
+                    EV << "Asking the status to actual exec: "<<tmp->getOriginalExecId() <<"-"<<tmp->getRelativeJobId()
+                            <<"to "<<tmp->getActualExecId()<<endl;
+                }else{
+                    tmp = msg->dup();
+                    tmp->setStatusRequest(true);
+                    tmp->setAck(true);
+                    tmp->setIsEnded(false);
+                    portId=tmp->getClientId()-1;
+                    send(tmp,"exec$o",portId);
+                }
+            }
+        }
     }
-      //delete the copy in the local storage
 }
-*/
+
 void Executor::newJob(msg_check *msg){
     msg_check *msgSend;
     const char *id;
@@ -488,7 +553,7 @@ void Executor::timeoutLoadBalancingHandler(){
          }
     }
     else{
-        tmp->setHasEnded(false);
+        tmp->setStatusRequest(false);
         tmp->setProbing(false);
         tmp->setAck(false);
         tmp->setReRouted(true);
@@ -516,7 +581,7 @@ void Executor::timeoutJobExecutionHandler(){
     jobId = msgServiced->getRelativeJobId();
     portId = msgServiced->getClientId()-1;  //Source id-1=portId
     EV<<"Completed service of "<<originalExecutor<<"with ID: "<<jobId<<" creating by the user ID "<<portId<<endl;
-    msgServiced->setHasEnded(true);
+    msgServiced->setStatusRequest(true);
     /*if(msgServiced->getReRouted()==true){
          msgSend= msgServiced->dup();
          send(msgSend,"load_send",msgSend->getOriginalExecId());
@@ -593,7 +658,7 @@ void Executor::selfMessage(msg_check *msg){
        */
 
            if (msg == timeoutJobComputation){
-               timeoutJobExecutionHandler();
+              timeoutJobExecutionHandler();
            }
            /*else
                if(msg==timeoutEndOfReRoutedExecution){

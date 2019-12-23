@@ -10,11 +10,14 @@ private:
   int sourceID;
   int nbGenMessages;
   int N,E;
-  msg_check *sendMessageEvent;
-  msg_check *timeoutEvent;
+  msg_check *sendNewJob;
+  msg_check *timeoutAckNewJob;
+  msg_check *checkJobStatus;
   msg_check *msg_to_ack;
   simtime_t timeout;
-  std::map<std::string,int> workInProgress;
+  bool startCheckJobStatus;
+  std::map<std::string,msg_check *> workInProgress;
+  void jobStatusHandler();
 
 protected:
   virtual void initialize();
@@ -30,25 +33,26 @@ Define_Module(Client);
 
 Client::Client()
 {
-    timeoutEvent = sendMessageEvent = msg_to_ack = nullptr;
+    checkJobStatus = timeoutAckNewJob = sendNewJob = msg_to_ack = nullptr;
 }
 
 Client::~Client()
 {
-    cancelAndDelete(timeoutEvent);
-    cancelAndDelete(sendMessageEvent);
+    cancelAndDelete(timeoutAckNewJob);
+    cancelAndDelete(sendNewJob);
 }
 
 void Client::initialize() {
     //initializing variables
-    sendMessageEvent = new msg_check("sendMessageEvent");
-    timeoutEvent = new msg_check("timeoutEvent");
+    sendNewJob = new msg_check("sendNewJob");
+    timeoutAckNewJob = new msg_check("timeoutAckNewJob");
+    checkJobStatus = new msg_check("checkJobStatus");
     nbGenMessages=0;
     timeout=0.5;
     sourceID=getId()-1;   //defines the Priority-ID of the message that each source will transmit(different sources send different priorities messages)
-
     //EV<<"Client ID "<<sourceID<<endl;
-    scheduleAt(simTime(), sendMessageEvent); //generates the first packet
+    scheduleAt(simTime() + timeout, checkJobStatus);
+    scheduleAt(simTime() + timeout, sendNewJob); //generates the first packet
     E = par("E"); //non volatile parameters --once defined they never change
     N = par("N");
 
@@ -65,7 +69,7 @@ void Client::handleMessage(cMessage *cmsg) {
     jobId.append(std::to_string(msg->getOriginalExecId()));
     jobId.append("-");
     jobId.append(std::to_string(msg->getRelativeJobId()));
-    if (msg == sendMessageEvent){
+    if (msg == sendNewJob){
         char msgname[20];
         ++nbGenMessages; //Total number of packets sent by a specific source(thus with the same priority) up to now
         sprintf(msgname, "message%d-#%d", sourceID, nbGenMessages);
@@ -75,7 +79,7 @@ void Client::handleMessage(cMessage *cmsg) {
         destinationPort=destinationMachine-N-2;
 
         message = new msg_check(msgname);
-        message->setHasEnded(false);
+        message->setStatusRequest(false);
         message->setProbing(false);
         message->setJobComplexity(0.2); //initialize to the partial elaboration done of a packet; will be useful for server utilization signal and preemptive resume
         message->setRelativeJobId(0); //will be useful for computing the per class extended service time
@@ -84,6 +88,7 @@ void Client::handleMessage(cMessage *cmsg) {
         message->setOriginalExecId(destinationPort);
         message->setQueueLength(0);
         message->setReRouted(false);
+        message->setIsEnded(false);
         message->setAck(false);
         message->setNewJob(true);
         message->setReBoot(false); //PHIL:questo viene settato come true da un executor dopo aver crashato ed essersi ripreso. In questo
@@ -95,39 +100,68 @@ void Client::handleMessage(cMessage *cmsg) {
         msg_to_ack=message->dup();
         delete message;
         send(msg_to_ack->dup(),"user$o",destinationPort);  //send the message to the queue
-        scheduleAt(simTime()+timeout, timeoutEvent);//waiting ack
+        scheduleAt(simTime()+timeout, timeoutAckNewJob);//waiting ack
 
     }
     else{
         //if the message is a timeout event the message it is re-sent to the executor
-        if (msg==timeoutEvent) {
-            EV << "Timeout expired, resending message and restarting timer\n";
+        if (msg==timeoutAckNewJob) {
+            EV << "Timeout expired, re-sending message and restarting timer\n";
 
             send(msg_to_ack->dup(),"user$o",msg_to_ack->getOriginalExecId());
             //start the timeout for the re-transmission
-            scheduleAt(simTime()+timeout, timeoutEvent);
+            scheduleAt(simTime()+timeout, timeoutAckNewJob);
             }
-        else{
+        else
             //end of the processing
-            if(msg->getHasEnded()==true){
-                EV<<"end of computation "<<msg->getOriginalExecId()<<"-"<<msg->getRelativeJobId()<<endl;
-                //delete the job from the list of the job currently in processing
-                workInProgress.erase(jobId);
-                }
-            else{ //received the ack from the executor, the job was received correctly
-                 if(msg->getAck()==true){
-                    workInProgress.insert(std::pair<std::string, int>(jobId,msg->getOriginalExecId()));
-                    EV << "ACK received for "<<jobId <<" from "<<workInProgress.at(jobId)<<endl;
-                    cancelEvent(timeoutEvent);
-                    delete msg_to_ack;
-                    //simulate an exponential generation of packets
-                    interArrivalTime=exponential(par("interArrivalTime").doubleValue());
-                    //re-start the timer for new jobs
-                    scheduleAt(simTime()+interArrivalTime, sendMessageEvent);
+            if(msg->getStatusRequest()==true){
+                if(msg->getAck()==true){
+                    if(msg->getIsEnded()==true){
+                        EV<<"Completed: "<<jobId<<endl;
+
+                        //delete the job from the list of the job currently in processing
+                        workInProgress.erase(jobId);
+                        destinationPort = msg->getOriginalExecId();
+                        send(msg->dup(),"user$o",destinationPort);
+                    }
+                    else{
+                        EV<<"Not completed: "<<msg->getOriginalExecId()<<"-"<<msg->getRelativeJobId()<<endl;
+                    }
                 }
             }
-            delete msg;
-        }
+            else //received the ack from the executor, the job was received correctly
+                if(msg->getNewJob()){
+                     if(msg->getAck()==true){
+                        msg->setNewJob(false);
+                        msg->setAck(false);
+                        workInProgress.insert(std::pair<std::string, msg_check *>(jobId,msg));
+                        EV << "ACK received for "<<jobId <<" from "<<workInProgress.at(jobId)<<endl;
+                        cancelEvent(timeoutAckNewJob);
+                        delete msg_to_ack;
+                        //simulate an exponential generation of packets
+                        interArrivalTime=exponential(par("interArrivalTime").doubleValue());
+                        //re-start the timer for new jobs
+                        scheduleAt(simTime()+interArrivalTime, sendNewJob);
+                    }
+                }
+                 else
+                    if(msg == checkJobStatus){
+                      jobStatusHandler();
+                    }
     }
-    //else if (end of processing)... else if(msg=controllo a che punto sono).... lo faro dopo
+}
+
+void Client::jobStatusHandler(){
+    std::map<std::string, msg_check *>::iterator search;
+    msg_check *message;
+    int destinationPort;
+    for (search = workInProgress.begin();search != workInProgress.end(); ++search){
+        message = search->second->dup();
+        message->setName("job status request");
+        message->setStatusRequest(true);
+        destinationPort = message->getOriginalExecId();
+        EV<<"Asking the status of: "<<message->getOriginalExecId()<<"-"<<message->getRelativeJobId()<<endl;
+        send(message,"user$o",destinationPort);
+    }
+    scheduleAt(simTime() + timeout, checkJobStatus);
 }

@@ -6,12 +6,12 @@ packet msg_check //name of the new type of message
     int ActualExecId;
     simtime_t JobComplexity;
     int QueueLength;
-    bool HasEnded;
+    bool StatusRequest;
     bool Probing;
     bool ReRouted;
     bool Ack;
     bool NewJob;  
-    bool checkPercentageWork;
+    bool IsEnded;
    	bool ReBoot;
     bool NewJobsQueue;
     bool JobQueue;

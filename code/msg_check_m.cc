@@ -187,12 +187,12 @@ msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kin
     this->ActualExecId = 0;
     this->JobComplexity = 0;
     this->QueueLength = 0;
-    this->HasEnded = false;
+    this->StatusRequest = false;
     this->Probing = false;
     this->ReRouted = false;
     this->Ack = false;
     this->NewJob = false;
-    this->checkPercentageWork = false;
+    this->IsEnded = false;
     this->ReBoot = false;
     this->NewJobsQueue = false;
     this->JobQueue = false;
@@ -226,12 +226,12 @@ void msg_check::copy(const msg_check& other)
     this->ActualExecId = other.ActualExecId;
     this->JobComplexity = other.JobComplexity;
     this->QueueLength = other.QueueLength;
-    this->HasEnded = other.HasEnded;
+    this->StatusRequest = other.StatusRequest;
     this->Probing = other.Probing;
     this->ReRouted = other.ReRouted;
     this->Ack = other.Ack;
     this->NewJob = other.NewJob;
-    this->checkPercentageWork = other.checkPercentageWork;
+    this->IsEnded = other.IsEnded;
     this->ReBoot = other.ReBoot;
     this->NewJobsQueue = other.NewJobsQueue;
     this->JobQueue = other.JobQueue;
@@ -249,12 +249,12 @@ void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
     doParsimPacking(b,this->ActualExecId);
     doParsimPacking(b,this->JobComplexity);
     doParsimPacking(b,this->QueueLength);
-    doParsimPacking(b,this->HasEnded);
+    doParsimPacking(b,this->StatusRequest);
     doParsimPacking(b,this->Probing);
     doParsimPacking(b,this->ReRouted);
     doParsimPacking(b,this->Ack);
     doParsimPacking(b,this->NewJob);
-    doParsimPacking(b,this->checkPercentageWork);
+    doParsimPacking(b,this->IsEnded);
     doParsimPacking(b,this->ReBoot);
     doParsimPacking(b,this->NewJobsQueue);
     doParsimPacking(b,this->JobQueue);
@@ -272,12 +272,12 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->ActualExecId);
     doParsimUnpacking(b,this->JobComplexity);
     doParsimUnpacking(b,this->QueueLength);
-    doParsimUnpacking(b,this->HasEnded);
+    doParsimUnpacking(b,this->StatusRequest);
     doParsimUnpacking(b,this->Probing);
     doParsimUnpacking(b,this->ReRouted);
     doParsimUnpacking(b,this->Ack);
     doParsimUnpacking(b,this->NewJob);
-    doParsimUnpacking(b,this->checkPercentageWork);
+    doParsimUnpacking(b,this->IsEnded);
     doParsimUnpacking(b,this->ReBoot);
     doParsimUnpacking(b,this->NewJobsQueue);
     doParsimUnpacking(b,this->JobQueue);
@@ -346,14 +346,14 @@ void msg_check::setQueueLength(int QueueLength)
     this->QueueLength = QueueLength;
 }
 
-bool msg_check::getHasEnded() const
+bool msg_check::getStatusRequest() const
 {
-    return this->HasEnded;
+    return this->StatusRequest;
 }
 
-void msg_check::setHasEnded(bool HasEnded)
+void msg_check::setStatusRequest(bool StatusRequest)
 {
-    this->HasEnded = HasEnded;
+    this->StatusRequest = StatusRequest;
 }
 
 bool msg_check::getProbing() const
@@ -396,14 +396,14 @@ void msg_check::setNewJob(bool NewJob)
     this->NewJob = NewJob;
 }
 
-bool msg_check::getCheckPercentageWork() const
+bool msg_check::getIsEnded() const
 {
-    return this->checkPercentageWork;
+    return this->IsEnded;
 }
 
-void msg_check::setCheckPercentageWork(bool checkPercentageWork)
+void msg_check::setIsEnded(bool IsEnded)
 {
-    this->checkPercentageWork = checkPercentageWork;
+    this->IsEnded = IsEnded;
 }
 
 bool msg_check::getReBoot() const
@@ -580,12 +580,12 @@ const char *msg_checkDescriptor::getFieldName(int field) const
         "ActualExecId",
         "JobComplexity",
         "QueueLength",
-        "HasEnded",
+        "StatusRequest",
         "Probing",
         "ReRouted",
         "Ack",
         "NewJob",
-        "checkPercentageWork",
+        "IsEnded",
         "ReBoot",
         "NewJobsQueue",
         "JobQueue",
@@ -606,12 +606,12 @@ int msg_checkDescriptor::findField(const char *fieldName) const
     if (fieldName[0]=='A' && strcmp(fieldName, "ActualExecId")==0) return base+3;
     if (fieldName[0]=='J' && strcmp(fieldName, "JobComplexity")==0) return base+4;
     if (fieldName[0]=='Q' && strcmp(fieldName, "QueueLength")==0) return base+5;
-    if (fieldName[0]=='H' && strcmp(fieldName, "HasEnded")==0) return base+6;
+    if (fieldName[0]=='S' && strcmp(fieldName, "StatusRequest")==0) return base+6;
     if (fieldName[0]=='P' && strcmp(fieldName, "Probing")==0) return base+7;
     if (fieldName[0]=='R' && strcmp(fieldName, "ReRouted")==0) return base+8;
     if (fieldName[0]=='A' && strcmp(fieldName, "Ack")==0) return base+9;
     if (fieldName[0]=='N' && strcmp(fieldName, "NewJob")==0) return base+10;
-    if (fieldName[0]=='c' && strcmp(fieldName, "checkPercentageWork")==0) return base+11;
+    if (fieldName[0]=='I' && strcmp(fieldName, "IsEnded")==0) return base+11;
     if (fieldName[0]=='R' && strcmp(fieldName, "ReBoot")==0) return base+12;
     if (fieldName[0]=='N' && strcmp(fieldName, "NewJobsQueue")==0) return base+13;
     if (fieldName[0]=='J' && strcmp(fieldName, "JobQueue")==0) return base+14;
@@ -722,12 +722,12 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
         case 3: return long2string(pp->getActualExecId());
         case 4: return simtime2string(pp->getJobComplexity());
         case 5: return long2string(pp->getQueueLength());
-        case 6: return bool2string(pp->getHasEnded());
+        case 6: return bool2string(pp->getStatusRequest());
         case 7: return bool2string(pp->getProbing());
         case 8: return bool2string(pp->getReRouted());
         case 9: return bool2string(pp->getAck());
         case 10: return bool2string(pp->getNewJob());
-        case 11: return bool2string(pp->getCheckPercentageWork());
+        case 11: return bool2string(pp->getIsEnded());
         case 12: return bool2string(pp->getReBoot());
         case 13: return bool2string(pp->getNewJobsQueue());
         case 14: return bool2string(pp->getJobQueue());
@@ -754,12 +754,12 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
         case 3: pp->setActualExecId(string2long(value)); return true;
         case 4: pp->setJobComplexity(string2simtime(value)); return true;
         case 5: pp->setQueueLength(string2long(value)); return true;
-        case 6: pp->setHasEnded(string2bool(value)); return true;
+        case 6: pp->setStatusRequest(string2bool(value)); return true;
         case 7: pp->setProbing(string2bool(value)); return true;
         case 8: pp->setReRouted(string2bool(value)); return true;
         case 9: pp->setAck(string2bool(value)); return true;
         case 10: pp->setNewJob(string2bool(value)); return true;
-        case 11: pp->setCheckPercentageWork(string2bool(value)); return true;
+        case 11: pp->setIsEnded(string2bool(value)); return true;
         case 12: pp->setReBoot(string2bool(value)); return true;
         case 13: pp->setNewJobsQueue(string2bool(value)); return true;
         case 14: pp->setJobQueue(string2bool(value)); return true;
