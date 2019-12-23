@@ -19,7 +19,7 @@ private:
     simtime_t timeoutFailure;
     simtime_t timeoutEndActual;
     simtime_t defServiceTime;
-    simtime_t expPar;
+
 
     int E,N,nArrived,myId;
     double probEvent;
@@ -81,11 +81,8 @@ void Executor::initialize() {
     probEvent=par("probEvent");
     failure=false;
  // The exponential value is computed in the handleMessage; Set the service time as exponential
-    expPar=exponential(par("defServiceTime").doubleValue());
-    //forward_backup = new msg_check("sending the message for backup");
-    //forward_id = new msg_check("notify the user about job id");
-    //probe = new msg_check("Ask the load");
-    //reply = new msg_check("Reply with the queue value");
+
+
     timeoutJobComputation = new msg_check("Job completed");
     timeoutLoadBalancing = new msg_check("timeoutLoadBalancing");
     timeoutReRouted = new msg_check("timeoutReRouted");
@@ -93,7 +90,6 @@ void Executor::initialize() {
     //timeoutEndOfReRoutedExecution = new msg_check("timeout actual exec notifies end of execution to original exec");
 
     timeoutLoad=0.1;
-
     timeoutFailure=0.1;
     timeoutEndActual=0.2;
 }
@@ -108,7 +104,7 @@ void Executor::handleMessage(cMessage *cmsg) {
    const char * id,* job_id;
    int machine;
 
-   //failureEvent(msg,probEvent);
+   failureEvent(msg,probEvent);
    if(failure){
        if(msg==timeoutFailureEnd) {
             msgSend = new msg_check("Failure end");

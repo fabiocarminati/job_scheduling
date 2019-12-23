@@ -9,14 +9,13 @@ using namespace omnetpp;
 class Storage : public cSimpleModule {
 private:
 
-    //STD::map used to store the message relative to a job. The job are searched using the JobId field in the message.
     std::map<std::string, msg_check *> newJobsQueue;
     std::map<std::string, msg_check *> jobQueue;
     std::map<std::string, msg_check *> reRoutedQueue;
     std::map<std::string, msg_check *> completedJobQueue;
 
     void searchMessage(std::string jobId,  msg_check *msg, std::map<std::string, msg_check *> *storedMap);
-    void executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap,bool jobFlag,bool newJobFlag,bool reRoutedFlag,bool completedFlag);
+    void executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap);
 
 
 
@@ -66,21 +65,16 @@ void Storage::handleMessage(cMessage *cmsg) {
 
    if(msg->getReBoot()==true){
        EV<<"the failure of executor "<<msg->getOriginalExecId()<<" is detected by the storage"<<endl;
-
-       executorReboot(jobId,msg,&jobQueue,true,false,false,false);
-
-       executorReboot(jobId,msg,&newJobsQueue,false,true,false,false);
-
-       executorReboot(jobId,msg,&reRoutedQueue,false,false,true,false);
-
-       executorReboot(jobId,msg,&completedJobQueue,false,false,false,true);
+       executorReboot(jobId,msg,&jobQueue);
+       executorReboot(jobId,msg,&newJobsQueue);
+       executorReboot(jobId,msg,&reRoutedQueue);
+       executorReboot(jobId,msg,&completedJobQueue);
 
        msgBackup = new msg_check("End recover backup");
        msgBackup->setBackupComplete(true);
        msgBackup->setReBoot(true);
        send(msgBackup,"backup_rec$o");
        EV<<"notify end of backup to executor"<<endl;
-
 
    }else if(msg->getNewJobsQueue()==true){
            msg->setNewJobsQueue(true);
@@ -103,7 +97,7 @@ void Storage::handleMessage(cMessage *cmsg) {
    delete msg;
 }
 
-void Storage::executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap,bool jobFlag,bool newJobFlag,bool reRoutedFlag,bool completedFlag){
+void Storage::executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap){
 
     msg_check *msgBackup;
     std::map<std::string, msg_check *>::iterator search;
@@ -111,12 +105,7 @@ void Storage::executorReboot(std::string jobId, msg_check *msg,std::map<std::str
     for (search = storedMap->begin();search != storedMap->end(); ++search){
         msgBackup=search->second->dup();
         msgBackup->setName("send backup copy");
-        msgBackup->setJobQueue(jobFlag);
-        msgBackup->setNewJobsQueue(newJobFlag);
-        msgBackup->setReRoutedJobQueue(reRoutedFlag);
-        msgBackup->setCompletedQueue(completedFlag);
         msgBackup->setReBoot(true);
-
         EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
         send(msgBackup,"backup_rec$o");
     }

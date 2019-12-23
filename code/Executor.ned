@@ -1,9 +1,8 @@
 simple Executor
 {    
     parameters:
-	//	string schedulingPolicy;
-		volatile double defServiceTime  @unit(s); 
-		    @display("i=block/queue");
+
+		@display("i=block/queue");
 		int N;
         int E;
         double probEvent;

@@ -15,6 +15,8 @@ private:
   msg_check *checkJobStatus;
   msg_check *msg_to_ack;
   simtime_t timeout;
+  simtime_t timeoutStatus;
+  simtime_t jobComplexity;
   bool startCheckJobStatus;
   std::map<std::string,msg_check *> workInProgress;
   void jobStatusHandler();
@@ -49,12 +51,15 @@ void Client::initialize() {
     checkJobStatus = new msg_check("checkJobStatus");
     nbGenMessages=0;
     timeout=0.5;
+    timeoutStatus=50;
     sourceID=getId()-1;   //defines the Priority-ID of the message that each source will transmit(different sources send different priorities messages)
     //EV<<"Client ID "<<sourceID<<endl;
-    scheduleAt(simTime() + timeout, checkJobStatus);
+    scheduleAt(simTime() + timeoutStatus, checkJobStatus);
     scheduleAt(simTime() + timeout, sendNewJob); //generates the first packet
     E = par("E"); //non volatile parameters --once defined they never change
     N = par("N");
+    jobComplexity = par("jobComplexity");
+    EV<<"job complexity"<<jobComplexity<<endl;
 
 }
 
@@ -133,6 +138,7 @@ void Client::handleMessage(cMessage *cmsg) {
                         EV<<"Not completed: "<<msg->getOriginalExecId()<<"-"<<msg->getRelativeJobId()<<endl;
                     }
                 }
+                delete msg;
             }
             else //received the ack from the executor, the job was received correctly
                 if(msg->getNewJob()){
@@ -168,5 +174,5 @@ void Client::jobStatusHandler(){
         EV<<"Asking the status of: "<<message->getOriginalExecId()<<"-"<<message->getRelativeJobId()<<endl;
         send(message,"user$o",destinationPort);
     }
-    scheduleAt(simTime() + timeout, checkJobStatus);
+    scheduleAt(simTime() + timeoutStatus, checkJobStatus);
 }
