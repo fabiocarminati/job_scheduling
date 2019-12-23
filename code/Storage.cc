@@ -2,7 +2,7 @@
 #include <omnetpp.h>
 #include <msg_check_m.h>
 #include <map>
-#define SIZE 1000000
+
 
 using namespace omnetpp;
 
@@ -19,9 +19,14 @@ private:
 
 
 
+
 protected:
     virtual void initialize() override;
     virtual void handleMessage(cMessage *cmsg) override;
+    simsignal_t avgJobQueueLengthSignal;
+    simsignal_t avgNewJobQueueLengthSignal;
+    simsignal_t avgReRoutedJobQueueLengthSignal;
+    simsignal_t avgCompletedJobQueueLengthSignal;
 
 public:
 
@@ -50,14 +55,17 @@ Storage::~Storage()
      ->The map function jobQueue that contains all the messages waiting to be processed by that executor
  */
 void Storage::initialize() {
-
+    avgJobQueueLengthSignal = registerSignal("avgJobQueueLength");
+    avgNewJobQueueLengthSignal = registerSignal("avgNewJobQueueLength");
+    avgReRoutedJobQueueLengthSignal = registerSignal("avgReRoutedJobQueueLength");
+    avgCompletedJobQueueLengthSignal = registerSignal("avgCompletedJobQueueLength");
 }
 void Storage::handleMessage(cMessage *cmsg) {
    // Casting from cMessage to msg_check
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
    msg_check *msgBackup;
    std::string jobId;
-
+   long jobIdLength,newJobIdLength,reRoutedJobIdLength,completedJobIdLength;
 
    jobId.append(std::to_string(msg->getOriginalExecId()));
    jobId.append("-");
@@ -80,18 +88,26 @@ void Storage::handleMessage(cMessage *cmsg) {
            msg->setNewJobsQueue(true);
            searchMessage(jobId,msg,&newJobsQueue);
            EV<<"working on NEWJOB map for: "<<jobId<<endl;
+           newJobIdLength=newJobsQueue.size();
+           emit(avgNewJobQueueLengthSignal,newJobIdLength);
          }else if(msg->getJobQueue()==true){
                    msg->setJobQueue(true);
                    searchMessage(jobId,msg,&jobQueue);
                    EV<<"working on JOBID map for: "<<jobId<<endl;
+                   jobIdLength=jobQueue.size();
+                   emit(avgJobQueueLengthSignal,jobIdLength);
                 }else if(msg->getReRoutedJobQueue()==true){
                            msg->setReRoutedJobQueue(true);
                            searchMessage(jobId,msg,&reRoutedQueue);
                            EV<<"working on REROUTED map for: "<<jobId<<endl;
+                           reRoutedJobIdLength=reRoutedQueue.size();
+                           emit(avgReRoutedJobQueueLengthSignal,reRoutedJobIdLength);
                        }else if(msg->getCompletedQueue()==true){
                                    msg->setCompletedQueue(true);
                                    searchMessage(jobId,msg,&completedJobQueue);
                                    EV<<"working on ENDED JOBS map for: "<<jobId<<endl;
+                                   completedJobIdLength=completedJobQueue.size();
+                                   emit(avgCompletedJobQueueLengthSignal,completedJobIdLength);
            }
 
    delete msg;
@@ -115,14 +131,12 @@ void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::str
     //Search if the job is already present
     search=storedMap->find(jobId);
     if (search != storedMap->end()){  //a key is found(the msg has already been inserted in that map)
-        //Delete the old job entry
         delete search->second;
         storedMap->erase(jobId);
-
         EV<<"Erase "<<jobId<<" from storage"<<endl;
     }
     else{
-        //No job found, insert it has new job
+        //No job found, insert it as new job
         storedMap->insert(std::pair<std::string ,msg_check *>(jobId, msg->dup()));
         EV<<"New element with ID "<<jobId<< " added in the secure storage in the map "<<endl;
         EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;

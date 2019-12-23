@@ -15,11 +15,8 @@ private:
     //msg_check *timeoutEndOfReRoutedExecution;
 
     simtime_t timeoutLoad;
-
     simtime_t timeoutFailure;
     simtime_t timeoutEndActual;
-    simtime_t defServiceTime;
-
 
     int E,N,nArrived,myId;
     double probEvent;
@@ -75,12 +72,10 @@ void Executor::initialize() {
     N= par("N");
     E = par("E"); //non volatile parameters --once defined they never change
     myId=getId()-2-N;
-    //EV<<myId<<endl;
     nArrived=0;
 
     probEvent=par("probEvent");
     failure=false;
- // The exponential value is computed in the handleMessage; Set the service time as exponential
 
 
     timeoutJobComputation = new msg_check("Job completed");
@@ -113,15 +108,15 @@ void Executor::handleMessage(cMessage *cmsg) {
             msgSend->setOriginalExecId(myId);
             EV<<"Reboot phase starts"<<endl<<"....."<<endl;
             send(msgSend,"backup_send$o");
+            bubble("Reboot mode");
 
        }
        else if(!msg->isSelfMessage() && msg->getReBoot()==true){
-                           // EV<<"RE "<<msg->getReRouted()<<" JOB "<<msg->getJobQueue()<<" NEW "<<msg->getNewJobsQueue()<<endl;
                 rePopulateQueues(msg);
                 //delete(msg);
              }
            else{
-               EV<<"The executor is not in normal mode and this is not a msg coming from the backup:ignore it"<<endl;
+               EV<<"The executor is reboot mode and this is not a msg coming from the backup:ignore it"<<endl;
                return;
            }
    }
@@ -170,10 +165,10 @@ void Executor::failureEvent(msg_check *msg,double probEvent){
      cancelEvent(timeoutFailureEnd);
      scheduleAt(simTime()+timeoutFailure, timeoutFailureEnd);
      EV<<"A failure has happened:start failure phase "<<"......"<<endl;
+     bubble("Failure");
    }
  }
- //else
-        // EV<<"Due to Failure message is lost "<<endl;
+
 
 }
 
@@ -184,7 +179,6 @@ void Executor::rePopulateQueues(msg_check *msg){
         if(msg->getNewJobsQueue()==true){
             newJobsQueue.insert(msg->dup());
             EV<<"BACKUP In the new_job_queue"<<endl;
-            //balancedJob(msg);
         }else if(msg->getJobQueue()==true){
                   if(msg->getReRouted()==true){
                       jobQueue.insert(msg->dup());
@@ -192,7 +186,6 @@ void Executor::rePopulateQueues(msg_check *msg){
                   }else{
                       newJobsQueue.insert(msg->dup());
                       EV<<"BACKUP In the new job because has not been re routed"<<endl;
-                      //balancedJob(msg);
                   }
               }else if(msg->getReRoutedJobQueue()==true){
                       reRoutedJobs.add(msg->dup());
@@ -209,6 +202,7 @@ void Executor::rePopulateQueues(msg_check *msg){
     }
     else{
         EV<<"The backup process is over, executor is now in normal execution mode"<<endl<<".........."<<endl;
+        bubble("Normal mode");
         failure=false;//until I have recovered all the backup message I will still ignore all the other messages
         restartNormalMode();
     }
@@ -537,6 +531,7 @@ void Executor::timeoutLoadBalancingHandler(){
     tmp = check_and_cast<msg_check *>(newJobsQueue.front());
     if(processing){
         EV<<"NO one has a better queue than me "<<jobQueue.getLength()<<endl;
+        bubble("No load balancing");
         tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
         msgSend=tmp->dup();
             //msgSend->setActualExecId(msg->getActualExecId());
@@ -570,7 +565,7 @@ void Executor::timeoutLoadBalancingHandler(){
         tmp->setReRouted(true);
         tmp->setQueueLength(-1);
         tmp->setActualExecId(actualExec);
-
+        bubble("Load balancing");
         EV<<"Send to the machine "<<actualExec<<" that has a lower queue the "<<tmp->getRelativeJobId()<<endl;
         send(tmp->dup(),"load_send", actualExec); //tmp rimane dentro i miei newjobs???Non va nei rerouted?si lo fa alla ricezione dell ack
         scheduleAt(simTime()+timeoutLoad, timeoutReRouted);
