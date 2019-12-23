@@ -80,8 +80,8 @@ void Client::handleMessage(cMessage *cmsg) {
         sprintf(msgname, "message%d-#%d", sourceID, nbGenMessages);
 
         //select the executor among a set of uniform values
-        destinationMachine=3;
-        //destinationMachine=uniform(N+2,N+E+1);
+        //destinationMachine=3;
+        destinationMachine=uniform(N+2,N+E+1);
         destinationPort=destinationMachine-N-2;
 
         message = new msg_check(msgname);
