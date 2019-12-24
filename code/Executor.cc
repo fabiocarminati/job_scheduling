@@ -19,7 +19,7 @@ private:
     simtime_t timeoutEndActual;
 
     int E,N,nArrived,myId;
-    double probEvent;
+    double probEvent,probCrashDuringExecution;
     bool probingMode,failure;
 
     std::map<std::string,msg_check *> completedJob;
@@ -36,9 +36,10 @@ private:
     void reRoutedHandler(msg_check *msg);
     void timeoutLoadBalancingHandler();
     void timeoutJobExecutionHandler();
-    void failureEvent(msg_check *msg,double probEvent);
+    void failureEvent(double probEvent);
     void rePopulateQueues(msg_check *msg);
     void restartNormalMode();
+    void checkDuplicate(msg_check *msg,std::map<std::string, msg_check *> *completedJob);
 protected:
     virtual void initialize();// override;
     virtual void handleMessage(cMessage *cmsg);// override;
@@ -75,6 +76,7 @@ void Executor::initialize() {
     nArrived=0;
 
     probEvent=par("probEvent");
+    probCrashDuringExecution=par("probCrashDuringExecution");
     failure=false;
 
 
@@ -99,7 +101,8 @@ void Executor::handleMessage(cMessage *cmsg) {
    const char * id,* job_id;
    int machine;
 
-   failureEvent(msg,probEvent);
+
+   failureEvent(probEvent);
    if(failure){
        if(msg==timeoutFailureEnd) {
             msgSend = new msg_check("Failure end");
@@ -120,7 +123,9 @@ void Executor::handleMessage(cMessage *cmsg) {
                return;
            }
    }
-   else if(msg->isSelfMessage()){
+   else{
+         checkDuplicate(msg,&completedJob);
+         if(msg->isSelfMessage()){
                selfMessage(msg);
          }else{
              if(msg->getNewJob()==true){
@@ -135,16 +140,72 @@ void Executor::handleMessage(cMessage *cmsg) {
 
              delete msg;
          }
+   }
+}
+
+void Executor::checkDuplicate(msg_check *msg,std::map<std::string, msg_check *> *completedJob){
+    std::map<std::string, msg_check *>::iterator search;
+
+    msg_check *tmp;
+    bool isInJobQueue=false,isInNewJobQueue=false;
+    int isInReRoutedJobQueue=-1;
+    std::string jobId;
+
+    isInJobQueue=jobQueue.contains(msg);
+    isInNewJobQueue=newJobsQueue.contains(msg);
+    isInReRoutedJobQueue=reRoutedJobs.find(msg); //index of first match;-1 if not found
+    EV<<"bool job queue "<<isInJobQueue<<" bool new job queue "<<isInNewJobQueue<<" bool rerouted job queue "<<isInReRoutedJobQueue<<endl;
+    //EV<<"Show me NEW "<<newJobsQueue.getLength();
+    //EV<<"Show me REROURTED "<<reRoutedJobs.size();
+    //EV<<"Show me ENDED "<<completedJob->size()<<endl;
+    if(msg->getIsEnded())
+    {
+        jobId.append(std::to_string(msg->getOriginalExecId()));
+        jobId.append("-");
+        jobId.append(std::to_string(msg->getRelativeJobId()));
+        search=completedJob->find(jobId);
+        if (search != completedJob->end()){  //a key is found(the msg has already been inserted in that map)
+            delete search->second;
+            completedJob->erase(jobId);
+            EV<<"Erase in exec"<<jobId<<" from queue"<<endl;
+            msg->setCompletedQueue(true);
+            send(msg->dup(),"backup_send$o");
+        }
+        else
+            EV<<"New First time the packet arrives in this executor:process it"<<endl;
+    }
+
+    if(isInJobQueue)
+    {
+        tmp=check_and_cast<msg_check *>(jobQueue.remove(msg));
+        send(tmp,"backup_send$o");
+    }
+    if(isInNewJobQueue)
+    {
+
+        tmp=check_and_cast<msg_check *>(newJobsQueue.remove(msg));
+        send(tmp,"backup_send$o");
+    }
+    if(isInReRoutedJobQueue!=-1)
+    {
+        msg->setReRoutedJobQueue(true);
+        send(msg->dup(),"backup_send$o");
+        reRoutedJobs.remove(msg);
+    }
+
+    //EV<<"Show AFTER NEW "<<newJobsQueue.getLength();
+    //EV<<"Show AFTER REROURTED "<<reRoutedJobs.size();
+    //EV<<"Show AFTER ENDED "<<completedJob->size()<<endl;
 
 }
 
 
-void Executor::failureEvent(msg_check *msg,double probEvent){
-    msg_check *msgSend;
+void Executor::failureEvent(double prob){
+
     std::map<std::string, msg_check *>::iterator search;
  if(!failure)
  {
-   if(uniform(0,1)<probEvent){
+   if(uniform(0,1)<prob){
      failure=true;
      //outGoingPacket.clear();
      newJobsQueue.clear();
@@ -255,7 +316,12 @@ void Executor::balancedJob(msg_check *msg){
          if(i!=msg->getOriginalExecId()){
              msgSend = msg->dup();
              msgSend->setActualExecId(i);
-             send(msgSend,"load_send",i); //in caso di guasti???
+             failureEvent(probCrashDuringExecution);
+             if(failure){
+                 EV<<"crash when sending load balancing requests "<<endl;
+                 return;
+             }
+             send(msgSend,"load_send",i);
              EV<<"Asking the load to machine "<<msgSend->getActualExecId()<<endl;
              }
          //TO DO:ADD ONE TIMEOUT FOR ALL
@@ -277,6 +343,11 @@ void Executor::probeHandler(msg_check *msg){
         msgSend->setReRouted(false);
         EV<<"The machine "<<msgSend->getOriginalExecId()<<" has a queue "<<msgSend->getQueueLength()<<" than the one in this machine which has queue length="<<jobQueue.getLength()<<endl;
         msgSend->setQueueLength(jobQueue.getLength());
+        failureEvent(probCrashDuringExecution);
+        if(failure){
+            EV<<"crash in the middle of sending probing response "<<endl;
+            return;
+        }
         send(msgSend,"load_send",msgSend->getOriginalExecId());
         }
     else{
@@ -294,14 +365,17 @@ void Executor::reRoutedHandler(msg_check *msg){
     msg_check *msgSend,*tmp;
     int actualExecId;
     simtime_t timeoutJobComplexity;
-    if(msg->getAck()==false)  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
-        //NO IS WRONG THIS THINKING+1 is needed in order to avoid ping pong:exe machine 5 has queue length =3 while machine 1 has length  =2... without +1 5-2 and 1-3 but if a
-        //an arrival comes in 3
+    if(msg->getAck()==false)  {//the actual exec has received the packet;notifies the original exec
         msgSend = msg->dup();
         msgSend->setAck(true);
         msgSend->setStatusRequest(false);  //set message priority
         msgSend->setProbing(false);
         msgSend->setReRouted(true);
+        failureEvent(probCrashDuringExecution);
+        if(failure){
+            EV<<"crash in the middle of notify the packet received due to load balancing;TIMEOUT WILL EXPIRE:RESTART LOAD BALANCING "<<endl;
+            return;
+        }
         send(msgSend,"load_send",msgSend->getOriginalExecId());
 
         jobQueue.insert(msg->dup());
@@ -368,6 +442,7 @@ void Executor::statusRequestHandler(msg_check *msg){
                  tmp = msg->dup();
                  tmp->setReRouted(false);
                  //EV<<"send remove rerouted after STATUS REQUEST"<<endl;
+
                  send(tmp,"load_send",portId);
              }
              portId = msg->getClientId()-1;
@@ -567,6 +642,11 @@ void Executor::timeoutLoadBalancingHandler(){
         tmp->setActualExecId(actualExec);
         bubble("Load balancing");
         EV<<"Send to the machine "<<actualExec<<" that has a lower queue the "<<tmp->getRelativeJobId()<<endl;
+        failureEvent(probCrashDuringExecution);
+        if(failure){
+            EV<<"crash in the middle of sending load balancing:I will keep it myself "<<endl;
+            return;
+        }
         send(tmp->dup(),"load_send", actualExec); //tmp rimane dentro i miei newjobs???Non va nei rerouted?si lo fa alla ricezione dell ack
         scheduleAt(simTime()+timeoutLoad, timeoutReRouted);
     }
@@ -638,6 +718,7 @@ void Executor::selfMessage(msg_check *msg){
 
     if(msg==timeoutReRouted){
        if(newJobsQueue.getLength()>0){
+           EV<<"The load balancing receiver is down;load balancing non performed correctly"<<endl;
            msgServiced = check_and_cast<msg_check *>(newJobsQueue.front());
            balancedJob(msgServiced);
        }

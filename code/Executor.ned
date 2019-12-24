@@ -6,6 +6,7 @@ simple Executor
 		int N;
         int E;
         double probEvent;
+        double probCrashDuringExecution;
 
 // GENERAL STATISTICS
 
