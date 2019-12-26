@@ -18,7 +18,7 @@ private:
   simtime_t timeoutStatus;
   simtime_t jobComplexity;
   bool startCheckJobStatus;
-  std::map<std::string,msg_check *> workInProgress;
+  cArray workInProgress;
   void jobStatusHandler();
 
 protected:
@@ -51,7 +51,7 @@ void Client::initialize() {
     checkJobStatus = new msg_check("checkJobStatus");
     nbGenMessages=0;
     timeout=0.5;
-    timeoutStatus=50;
+    timeoutStatus=1;
     sourceID=getId()-1;   //defines the Priority-ID of the message that each source will transmit(different sources send different priorities messages)
     //EV<<"Client ID "<<sourceID<<endl;
     scheduleAt(simTime() + timeoutStatus, checkJobStatus);
@@ -69,11 +69,8 @@ void Client::handleMessage(cMessage *cmsg) {
     msg_check *message;
     // Casting from cMessage to msg_check
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
-    std::string jobId;
-    std::map<std::string, msg_check *>::iterator search;
-    jobId.append(std::to_string(msg->getOriginalExecId()));
-    jobId.append("-");
-    jobId.append(std::to_string(msg->getRelativeJobId()));
+    const char  *jobId;
+    jobId = msg->getName();
     if (msg == sendNewJob){
         char msgname[20];
         ++nbGenMessages; //Total number of packets sent by a specific source(thus with the same priority) up to now
@@ -104,8 +101,7 @@ void Client::handleMessage(cMessage *cmsg) {
 
         EV<<"msg sent to machine "<<destinationMachine<<" with user-output port "<<destinationPort<<endl;
         msg_to_ack=message->dup();
-        delete message;
-        send(msg_to_ack->dup(),"user$o",destinationPort);  //send the message to the queue
+        send(message,"user$o",destinationPort);  //send the message to the queue
         scheduleAt(simTime()+timeout, timeoutAckNewJob);//waiting ack
 
     }
@@ -128,15 +124,10 @@ void Client::handleMessage(cMessage *cmsg) {
                         send(msg->dup(),"user$o",destinationPort);
 
                         //delete the job from the list of the job currently in processing
-                        workInProgress.erase(jobId);
-                        search=workInProgress.find(jobId);
-                         if (search != workInProgress.end()){
-                             delete search->second;
-                             workInProgress.erase(jobId);
-                         }
+                        delete workInProgress.remove(jobId);
                     }
                     else{
-                        EV<<"Not completed: "<<msg->getOriginalExecId()<<"-"<<msg->getRelativeJobId()<<endl;
+                        EV<<"Not completed: "<<jobId<<endl;
                     }
                 }
                 delete msg;
@@ -146,8 +137,8 @@ void Client::handleMessage(cMessage *cmsg) {
                      if(msg->getAck()==true){
                         msg->setNewJob(false);
                         msg->setAck(false);
-                        workInProgress.insert(std::pair<std::string, msg_check *>(jobId,msg));
-                        EV << "ACK received for "<<jobId <<" from "<<workInProgress.at(jobId)<<endl;
+                        workInProgress.add(msg);
+                        EV << "ACK received for "<<jobId<<endl;
                         cancelEvent(timeoutAckNewJob);
                         delete msg_to_ack;
                         //simulate an exponential generation of packets
@@ -164,16 +155,20 @@ void Client::handleMessage(cMessage *cmsg) {
 }
 
 void Client::jobStatusHandler(){
-    std::map<std::string, msg_check *>::iterator search;
+    int i;
     msg_check *message;
+    cObject *obj;
     int destinationPort;
-    for (search = workInProgress.begin();search != workInProgress.end(); ++search){
-        message = search->second->dup();
-        message->setName("job status request");
-        message->setStatusRequest(true);
-        destinationPort = message->getOriginalExecId();
-        EV<<"Asking the status of: "<<message->getOriginalExecId()<<"-"<<message->getRelativeJobId()<<endl;
-        send(message,"user$o",destinationPort);
+    for (i = 0;i < workInProgress.size();i++){
+         obj = workInProgress.get(i);
+         if(obj!=nullptr){
+            message = check_and_cast<msg_check *>(obj);
+            message = message->dup();
+            message->setStatusRequest(true);
+            destinationPort = message->getOriginalExecId();
+            EV<<"Asking the status of: "<<message->getOriginalExecId()<<"-"<<message->getRelativeJobId()<<endl;
+            send(message,"user$o",destinationPort);
+        }
     }
     scheduleAt(simTime() + timeoutStatus, checkJobStatus);
 }

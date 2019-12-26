@@ -22,7 +22,7 @@ private:
     double probEvent,probCrashDuringExecution;
     bool probingMode,failure;
 
-    std::map<std::string,msg_check *> completedJob;
+    cArray completedJob;
     cQueue newJobsQueue;
     cQueue jobQueue;
     cQueue balanceResponses;
@@ -39,7 +39,7 @@ private:
     void failureEvent(double probEvent);
     void rePopulateQueues(msg_check *msg);
     void restartNormalMode();
-    void checkDuplicate(msg_check *msg,std::map<std::string, msg_check *> *completedJob);
+    void checkDuplicate(msg_check *msg);
 protected:
     virtual void initialize();// override;
     virtual void handleMessage(cMessage *cmsg);// override;
@@ -102,7 +102,7 @@ void Executor::handleMessage(cMessage *cmsg) {
    int machine;
 
 
-   failureEvent(probEvent);
+   //failureEvent(probEvent);
    if(failure){
        if(msg==timeoutFailureEnd) {
             msgSend = new msg_check("Failure end");
@@ -124,7 +124,7 @@ void Executor::handleMessage(cMessage *cmsg) {
            }
    }
    else{
-         checkDuplicate(msg,&completedJob);
+         //checkDuplicate(msg,&completedJob);
          if(msg->isSelfMessage()){
                selfMessage(msg);
          }else{
@@ -143,13 +143,13 @@ void Executor::handleMessage(cMessage *cmsg) {
    }
 }
 
-void Executor::checkDuplicate(msg_check *msg,std::map<std::string, msg_check *> *completedJob){
+void Executor::checkDuplicate(msg_check *msg){
     std::map<std::string, msg_check *>::iterator search;
 
     msg_check *tmp;
     bool isInJobQueue=false,isInNewJobQueue=false;
     int isInReRoutedJobQueue=-1;
-    std::string jobId;
+    const char *jobId;
 
     isInJobQueue=jobQueue.contains(msg);
     isInNewJobQueue=newJobsQueue.contains(msg);
@@ -160,9 +160,7 @@ void Executor::checkDuplicate(msg_check *msg,std::map<std::string, msg_check *> 
     //EV<<"Show me ENDED "<<completedJob->size()<<endl;
     if(msg->getIsEnded())
     {
-        jobId.append(std::to_string(msg->getOriginalExecId()));
-        jobId.append("-");
-        jobId.append(std::to_string(msg->getRelativeJobId()));
+        /*jobId = msg->getName();
         search=completedJob->find(jobId);
         if (search != completedJob->end()){  //a key is found(the msg has already been inserted in that map)
             delete search->second;
@@ -171,7 +169,7 @@ void Executor::checkDuplicate(msg_check *msg,std::map<std::string, msg_check *> 
             msg->setCompletedQueue(true);
             send(msg->dup(),"backup_send$o");
         }
-        else
+        else*/
             EV<<"New First time the packet arrives in this executor:process it"<<endl;
     }
 
@@ -201,7 +199,7 @@ void Executor::checkDuplicate(msg_check *msg,std::map<std::string, msg_check *> 
 
 
 void Executor::failureEvent(double prob){
-
+    return ;
     std::map<std::string, msg_check *>::iterator search;
  if(!failure)
  {
@@ -212,10 +210,7 @@ void Executor::failureEvent(double prob){
      jobQueue.clear();
      balanceResponses.clear();
      reRoutedJobs.clear();
-     for (search = completedJob.begin();search != completedJob.end(); ++search){
-         delete search->second;
-         completedJob.erase(search->first);
-     }
+     completedJob.clear();
      probingMode = false;//if probingMode = true means that i am waiting for responses by other executors but if I fail I stop also the timeout
      //thus I will never be able in the future to do probing becauset probingMode=true forever
 
@@ -234,7 +229,7 @@ void Executor::failureEvent(double prob){
 }
 
 void Executor::rePopulateQueues(msg_check *msg){
-    std::string jobId;
+    const char *jobId;
     if(msg->getBackupComplete()==false){
         msg->setReBoot(false);
         if(msg->getNewJobsQueue()==true){
@@ -252,10 +247,8 @@ void Executor::rePopulateQueues(msg_check *msg){
                       reRoutedJobs.add(msg->dup());
                       EV<<"BACKUP In the rerouted_queue"<<endl;
                      }else if(msg->getCompletedQueue()==true){
-                                  jobId.append(std::to_string(msg->getOriginalExecId()));
-                                  jobId.append("-");
-                                  jobId.append(std::to_string(msg->getRelativeJobId()));
-                                  completedJob.insert(std::pair<std::string, msg_check *>(jobId,msg->dup()));
+                                  jobId = msg->getName();
+                                  completedJob.add(msg->dup());
                                   EV<<"BACKUP in completed jobs"<<endl;
 
                            }
@@ -333,7 +326,7 @@ void Executor::balancedJob(msg_check *msg){
 
 void Executor::probeHandler(msg_check *msg){
     msg_check *msgSend;
-    if(msg->getAck()==false)  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
+    if(msg->get()==false)  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
         //NO IS WRONG THIS THINKING+1 is needed in order to avoid ping pong:exe machine 5 has queue length =3 while machine 1 has length  =2... without +1 5-2 and 1-3 but if a
         //an arrival comes in 3
         msgSend = msg->dup();
@@ -417,26 +410,21 @@ void Executor::reRoutedHandler(msg_check *msg){
 
 void Executor::statusRequestHandler(msg_check *msg){
     msg_check *tmp, *msgEnded;
-    int portId, i;
-    std::map<std::string, msg_check *>::iterator search;
-    std::string jobId;
-    bool found =false;
-    jobId.append(std::to_string(msg->getOriginalExecId()));
-    jobId.append("-");
-    jobId.append(std::to_string(msg->getRelativeJobId()));
+    cObject *obj;
+    int portId;
+    const char *jobId;
+    jobId = msg->getName();
+    EV<<"mi sta chiedendo "<<jobId<<endl;
     if(msg->getAck()==true){
-      EV << "ACK received for "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+      EV << "ACK received for "<<jobId<<endl;
       if(msg->getReRouted()==true){
          if(msg->getOriginalExecId()==myId){
              if(msg->getIsEnded()){
-                 for(i=0;i<reRoutedJobs.size();i++){
-                      tmp = check_and_cast<msg_check *>(reRoutedJobs[i]);
-                      if(tmp->getOriginalExecId()==msg->getOriginalExecId()
-                              &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
-                          reRoutedJobs.remove(i);
-                          EV << "Erasing from the rerouted jobs the job: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
-                          send(tmp->dup(),"backup_send$o");//notify erase in rerouted job queue to the storage
-                      }
+                 obj = reRoutedJobs.remove(jobId);
+                 if(obj!=nullptr){
+                     tmp = check_and_cast<msg_check *>(obj);
+                     EV << "Erasing from the rerouted jobs the job: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
+                     send(tmp,"backup_send$o");//notify erase in rerouted job queue to the storage
                  }
                  portId = msg->getActualExecId();
                  tmp = msg->dup();
@@ -452,12 +440,11 @@ void Executor::statusRequestHandler(msg_check *msg){
          }
       }else{//because the client will reply to the status reply
           if(msg->getIsEnded()){
-                   search=completedJob.find(jobId);
-                   if (search != completedJob.end()){
+                   obj = completedJob.remove(jobId);
+                   if (obj!=nullptr){
+                       tmp = check_and_cast<msg_check *>(obj);
                        EV << "Erasing in executor from the completed job queue: "<<jobId<<endl;
-                       send(search->second->dup(),"backup_send$o");//notify erase in completed job queue to the storage
-                       delete search->second;
-                       completedJob.erase(jobId);
+                       send(tmp,"backup_send$o");//notify erase in completed job queue to the storage
                    }
                    else{
                        EV << "FATAL ERROR: Erasing in executor from the completed job queue: "<<jobId<<endl;
@@ -466,10 +453,11 @@ void Executor::statusRequestHandler(msg_check *msg){
       }
     }
     else{
-        search=completedJob.find(jobId);
+        obj = completedJob.get(jobId);
         if(msg->getReRouted()==true){ //the actual exec has received the forwarded status request froom the original exec
-            if(search != completedJob.end()){
-                tmp = search->second->dup();
+            if(obj!=nullptr){
+                tmp = check_and_cast<msg_check *>(obj);
+                tmp = tmp->dup();
                 tmp->setStatusRequest(true);
                 tmp->setAck(true);
                 tmp->setIsEnded(true);
@@ -482,8 +470,9 @@ void Executor::statusRequestHandler(msg_check *msg){
             portId = tmp->getOriginalExecId();
             send(tmp,"load_send",portId);
         }else{
-            if(search != completedJob.end()){
-                tmp = search->second->dup();
+            if(obj!=nullptr){
+                tmp = check_and_cast<msg_check *>(obj);
+                tmp = tmp->dup();
                 tmp->setStatusRequest(true);
                 tmp->setAck(true);
                 tmp->setIsEnded(true);
@@ -491,17 +480,10 @@ void Executor::statusRequestHandler(msg_check *msg){
                 portId=tmp->getClientId()-1;
                 send(tmp,"exec$o",portId);
             }else{
-                found = false;
-                for(i=0;i<reRoutedJobs.size();i++){
-                    tmp = check_and_cast<msg_check *>(reRoutedJobs[i]);
-                    if(tmp->getOriginalExecId()==msg->getOriginalExecId()
-                            &&tmp->getRelativeJobId()==msg->getRelativeJobId()){
-                        found = true;
-                        msgEnded = tmp;
-                    }
-                }
-                if(found){
-                    tmp = msgEnded->dup();
+                obj = reRoutedJobs.get(jobId);
+                if(obj!=nullptr){
+                    tmp = check_and_cast<msg_check *>(obj);
+                    tmp = tmp->dup();
                     tmp->setStatusRequest(true);
                     tmp->setAck(false);
                     tmp->setReRouted(true);
@@ -542,6 +524,7 @@ void Executor::newJob(msg_check *msg){
 
     //Reply to the client
     port_id=msg->getClientId()-1;
+    msg->setName(id);
     msgSend=msg->dup();
     msgSend->setAck(true);
     send(msgSend,"exec$o",port_id);
@@ -684,7 +667,7 @@ void Executor::timeoutJobExecutionHandler(){
 
     send(msgSend,"backup_send$o");
 
-    completedJob.insert(std::pair<std::string, msg_check *>(jobId,msgServiced));//also in original exec add it
+    completedJob.add(msgServiced);//also in original exec add it
 
 
 
