@@ -114,7 +114,7 @@ void Executor::handleMessage(cMessage *cmsg) {
             bubble("Reboot mode");
 
        }
-       else if(!msg->isSelfMessage() && msg->getReBoot()==true){
+       else if(msg->getReBoot()==true){
                 rePopulateQueues(msg);
                 //delete(msg);
              }
@@ -243,7 +243,7 @@ void Executor::restartNormalMode(){
     if(jobQueue.isEmpty()){
         if(newJobsQueue.isEmpty())
             EV<<"JOB and NEWJOB queue are idle, the machine goes IDLE"<<endl;
-        else if(newJobsQueue.getLength()>0){
+        else {
                 tmp = check_and_cast<msg_check *>(newJobsQueue.front());
                 balancedJob(tmp);
             }
@@ -254,11 +254,10 @@ void Executor::restartNormalMode(){
          msgServiced = check_and_cast<msg_check *>(jobQueue.front());
          jobId = msgServiced->getRelativeJobId();
          portId = msgServiced->getClientId()-1;
-         if(!timeoutJobComputation->isScheduled()){
-             timeoutJobComplexity = msgServiced->getJobComplexity();
-             scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
-             EV<<"Starting service of "<<jobId<<" coming from user ID "<<portId<<" from the queue of the machine "<<msgServiced->getOriginalExecId()<<endl;
-         }
+         timeoutJobComplexity = msgServiced->getJobComplexity();
+         scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
+         EV<<"Starting service of "<<jobId<<" coming from user ID "<<portId<<" from the queue of the machine "<<msgServiced->getOriginalExecId()<<endl;
+
     }
 
 }
