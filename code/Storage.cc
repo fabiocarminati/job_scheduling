@@ -13,7 +13,7 @@ private:
     std::map<std::string, msg_check *> jobQueue;
     std::map<std::string, msg_check *> reRoutedQueue;
     std::map<std::string, msg_check *> completedJobQueue;
-
+    double totale;
     void searchMessage(std::string jobId,  msg_check *msg, std::map<std::string, msg_check *> *storedMap);
     void executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap);
 
@@ -23,10 +23,12 @@ private:
 protected:
     virtual void initialize() override;
     virtual void handleMessage(cMessage *cmsg) override;
-    simsignal_t avgJobQueueLengthSignal;
-    simsignal_t avgNewJobQueueLengthSignal;
-    simsignal_t avgReRoutedJobQueueLengthSignal;
-    simsignal_t avgCompletedJobQueueLengthSignal;
+    virtual void finish() override;
+    simsignal_t avgJobSignal;
+    simsignal_t avgNewSignal;
+    simsignal_t whyNotWorkSignal;
+   // simsignal_t avgReRoutedSignal;
+    //simsignal_t avgCompletedSignal;
 
 public:
 
@@ -64,17 +66,29 @@ Storage::~Storage()
      ->The map function jobQueue that contains all the messages waiting to be processed by that executor
  */
 void Storage::initialize() {
-    avgJobQueueLengthSignal = registerSignal("avgJobQueueLength");
-    avgNewJobQueueLengthSignal = registerSignal("avgNewJobQueueLength");
-    avgReRoutedJobQueueLengthSignal = registerSignal("avgReRoutedJobQueueLength");
-    avgCompletedJobQueueLengthSignal = registerSignal("avgCompletedJobQueueLength");
+    avgJobSignal = registerSignal("avgJob");
+    avgNewSignal = registerSignal("avgNew");
+    whyNotWorkSignal = registerSignal("whyNotWork");
+    //avgReRoutedSignal = registerSignal("avgReRouted");
+    //avgCompletedSignal = registerSignal("avgCompleted");
+    emit(avgJobSignal, 0);
+    emit(avgNewSignal, 0);
+    totale=0;
+    emit(whyNotWorkSignal,totale);
+   // emit(avgReRoutedSignal, 0);
+    //emit(avgCompletedSignal, 0);
+
+
+
 }
 void Storage::handleMessage(cMessage *cmsg) {
    // Casting from cMessage to msg_check
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
    msg_check *msgBackup;
    std::string jobId;
-   long jobIdLength,newJobIdLength,reRoutedJobIdLength,completedJobIdLength;
+   totale++;
+   emit(whyNotWorkSignal,totale);
+   double jobIdLength,newJobIdLength,reRoutedJobIdLength,completedJobIdLength;
 
    jobId.append(std::to_string(msg->getOriginalExecId()));
    jobId.append("-");
@@ -98,25 +112,29 @@ void Storage::handleMessage(cMessage *cmsg) {
            searchMessage(jobId,msg,&newJobsQueue);
            EV<<"working on NEWJOB map for: "<<jobId<<endl;
            newJobIdLength=newJobsQueue.size();
-           emit(avgNewJobQueueLengthSignal,newJobIdLength);
+           emit(avgNewSignal,newJobIdLength);
+           EV<<"   "<<newJobIdLength<<endl;
          }else if(msg->getJobQueue()==true){
                    msg->setJobQueue(true);
                    searchMessage(jobId,msg,&jobQueue);
                    EV<<"working on JOBID map for: "<<jobId<<endl;
                    jobIdLength=jobQueue.size();
-                   emit(avgJobQueueLengthSignal,jobIdLength);
+                   emit(avgJobSignal,jobIdLength);
+                   EV<<"   "<<jobIdLength<<endl;
                 }else if(msg->getReRoutedJobQueue()==true){
                            msg->setReRoutedJobQueue(true);
                            searchMessage(jobId,msg,&reRoutedQueue);
                            EV<<"working on REROUTED map for: "<<jobId<<endl;
                            reRoutedJobIdLength=reRoutedQueue.size();
-                           emit(avgReRoutedJobQueueLengthSignal,reRoutedJobIdLength);
+                           //emit(avgReRoutedSignal,reRoutedJobIdLength);
+                           EV<<"   "<<reRoutedJobIdLength<<endl;
                        }else if(msg->getCompletedQueue()==true){
                                    msg->setCompletedQueue(true);
                                    searchMessage(jobId,msg,&completedJobQueue);
                                    EV<<"working on ENDED JOBS map for: "<<jobId<<endl;
                                    completedJobIdLength=completedJobQueue.size();
-                                   emit(avgCompletedJobQueueLengthSignal,completedJobIdLength);
+                                   //emit(avgCompletedSignal,completedJobIdLength);
+                                   EV<<"   "<<completedJobIdLength<<endl;
            }
 
    delete msg;
@@ -149,4 +167,10 @@ void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::str
         EV<<"New element with ID "<<jobId<< " added in the secure storage in the map "<<endl;
         EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
     }
+}
+void Storage::finish()
+{
+    EV<<"END"<<endl;
+    EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<endl;
+
 }

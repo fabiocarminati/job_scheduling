@@ -102,7 +102,7 @@ void Executor::handleMessage(cMessage *cmsg) {
    int machine;
 
 
-   //failureEvent(probEvent);
+   failureEvent(probEvent);
    if(failure){
        if(msg==timeoutFailureEnd) {
             msgSend = new msg_check("Failure end");

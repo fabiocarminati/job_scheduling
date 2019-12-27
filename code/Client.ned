@@ -7,6 +7,12 @@ simple Client
         @display("i=block/source");
         int N;
         int E;
+        @signal[avgSendingRate](type="simtime_t");
+        @statistic[avgSendingRate](title="INTERARRIVAL RATE";record=vector, timeavg;interpolationmode=sample-hold);
+      	
+  	    @signal[avgComplexity](type="simtime_t");
+        @statistic[avgComplexity](title="JOB COMPLEXITY";record=vector, timeavg;interpolationmode=sample-hold);
+      	
     gates:
         inout user[];
 }

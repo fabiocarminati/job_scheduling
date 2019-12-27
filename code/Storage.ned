@@ -8,17 +8,22 @@ simple Storage
         int E;
 		
         // Average queue length
-        @signal[avgJobQueueLength](type="long");
-        @statistic[avgJobQueueLength](title="JOB QUEUE average queue length";record=vector, timeavg;interpolationmode=sample-hold);
+        @signal[avgJob](type="double");
+        @statistic[avgJob](title="JOB QUEUE";record=vector,timeavg;interpolationmode=sample-hold);
+        
+                // Average queue length
+        @signal[whyNotWork](type="double");
+        @statistic[whyNotWork](title="JOB QUEUE";record=vector,timeavg;interpolationmode=sample-hold);
+        
       
-      	@signal[avgNewJobQueueLength](type="long");
-        @statistic[avgNewJobQueueLength](title="NEW JOB QUEUE average queue length";record=vector, timeavg;interpolationmode=sample-hold);
+     	@signal[avgNew] (type="double");
+        @statistic[avgNew](title="NEW JOB QUEUE";record=vector, timeavg;interpolationmode=sample-hold);
         
-        @signal[avgReRoutedJobQueueLength](type="long");
-        @statistic[avgReRoutedJobQueueLength](title=" REROUTED JOB QUEUE average queue length";record=vector, timeavg;interpolationmode=sample-hold);
+        //@signal[avgReRouted](type="double");
+     //	@statistic[avgReRouted](title=" REROUTED JOB QUEUE";record=vector, timeavg;interpolationmode=sample-hold);
         
-        @signal[avgCompletedJobQueueLength](type="long");
-        @statistic[avgCompletedJobQueueLength](title="COMPLETED JOB QUEUE average queue length";record=vector, timeavg;interpolationmode=sample-hold);
+   //     @signal[avgCompleted](type="double");
+  //     	@statistic[avgCompleted](title="COMPLETED JOB QUEUE";record=vector, timeavg;interpolationmode=sample-hold);
     gates:
         inout backup_rec;
 }
