@@ -44,7 +44,16 @@ Storage::Storage()
 }
 Storage::~Storage()
 {
+    std::map<std::string, msg_check *>::iterator search;
 
+    for (search = newJobsQueue.begin();search != newJobsQueue.end(); ++search)
+         delete search->second;
+    for (search = jobQueue.begin();search != jobQueue.end(); ++search)
+         delete search->second;
+    for (search = reRoutedQueue.begin();search != reRoutedQueue.end(); ++search)
+         delete search->second;
+    for (search = completedJobQueue.begin();search != completedJobQueue.end(); ++search)
+         delete search->second;
 }
 /*
  This class represents a secure storage(his content will never be lost).
@@ -120,7 +129,6 @@ void Storage::executorReboot(std::string jobId, msg_check *msg,std::map<std::str
 
     for (search = storedMap->begin();search != storedMap->end(); ++search){
         msgBackup=search->second->dup();
-        msgBackup->setName("send backup copy");
         msgBackup->setReBoot(true);
         EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
         send(msgBackup,"backup_rec$o");
@@ -141,6 +149,4 @@ void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::str
         EV<<"New element with ID "<<jobId<< " added in the secure storage in the map "<<endl;
         EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
     }
-
-
 }
