@@ -39,7 +39,7 @@ private:
     void failureEvent(double probEvent);
     void rePopulateQueues(msg_check *msg);
     void restartNormalMode();
-    void checkDuplicate(msg_check *msg);
+    bool checkDuplicate(msg_check *msg);
 protected:
     virtual void initialize();// override;
     virtual void handleMessage(cMessage *cmsg);// override;
@@ -124,7 +124,6 @@ void Executor::handleMessage(cMessage *cmsg) {
            }
    }
    else{
-         //checkDuplicate(msg,&completedJob);
          if(msg->isSelfMessage()){
                selfMessage(msg);
          }else{
@@ -143,89 +142,60 @@ void Executor::handleMessage(cMessage *cmsg) {
    }
 }
 
-void Executor::checkDuplicate(msg_check *msg){
-    std::map<std::string, msg_check *>::iterator search;
-
-    msg_check *tmp;
-    bool isInJobQueue=false,isInNewJobQueue=false;
-    int isInReRoutedJobQueue=-1;
+bool Executor::checkDuplicate(msg_check *msg){
+    bool isInJobQueue;
+    bool isInNewJobQueue;
+    bool isInReRoutedJob;
+    bool isInCompletedJob;
     const char *jobId;
 
-    isInJobQueue=jobQueue.contains(msg);
-    isInNewJobQueue=newJobsQueue.contains(msg);
-    isInReRoutedJobQueue=reRoutedJobs.find(msg); //index of first match;-1 if not found
-    EV<<"bool job queue "<<isInJobQueue<<" bool new job queue "<<isInNewJobQueue<<" bool rerouted job queue "<<isInReRoutedJobQueue<<endl;
-    //EV<<"Show me NEW "<<newJobsQueue.getLength();
-    //EV<<"Show me REROURTED "<<reRoutedJobs.size();
-    //EV<<"Show me ENDED "<<completedJob->size()<<endl;
-    if(msg->getIsEnded())
-    {
-        /*jobId = msg->getName();
-        search=completedJob->find(jobId);
-        if (search != completedJob->end()){  //a key is found(the msg has already been inserted in that map)
-            delete search->second;
-            completedJob->erase(jobId);
-            EV<<"Erase in exec"<<jobId<<" from queue"<<endl;
-            msg->setCompletedQueue(true);
-            send(msg->dup(),"backup_send$o");
-        }
-        else*/
-            EV<<"New First time the packet arrives in this executor:process it"<<endl;
+    jobId = msg->getName();
+    isInJobQueue=false;
+    for (cQueue::Iterator it(jobQueue);!isInJobQueue&&!it.end(); ++it) {
+        if(strcmp((*it)->getName(), jobId)==0)
+            isInJobQueue=true;
     }
-
-    if(isInJobQueue)
-    {
-        tmp=check_and_cast<msg_check *>(jobQueue.remove(msg));
-        send(tmp,"backup_send$o");
+    isInNewJobQueue=false;
+    for (cQueue::Iterator it(newJobsQueue);!isInNewJobQueue&&!it.end(); ++it) {
+        if(strcmp((*it)->getName(), jobId)==0)
+            isInNewJobQueue=true;
     }
-    if(isInNewJobQueue)
-    {
+    isInReRoutedJob=reRoutedJobs.exist(jobId);
+    isInCompletedJob=completedJob.exist(jobId);
+    EV<<"bool job queue "<<isInJobQueue<<" bool new job queue "<<isInNewJobQueue
+            <<" bool rerouted job"<<isInReRoutedJob<<" bool completed job"<<isInCompletedJob<<endl;
 
-        tmp=check_and_cast<msg_check *>(newJobsQueue.remove(msg));
-        send(tmp,"backup_send$o");
+    if(isInJobQueue||isInNewJobQueue||isInReRoutedJob||isInCompletedJob){
+        EV<<"Duplicate found"<<endl;
+        return true;
     }
-    if(isInReRoutedJobQueue!=-1)
-    {
-        msg->setReRoutedJobQueue(true);
-        send(msg->dup(),"backup_send$o");
-        reRoutedJobs.remove(msg);
-    }
-
-    //EV<<"Show AFTER NEW "<<newJobsQueue.getLength();
-    //EV<<"Show AFTER REROURTED "<<reRoutedJobs.size();
-    //EV<<"Show AFTER ENDED "<<completedJob->size()<<endl;
-
+    return false;
 }
-
 
 void Executor::failureEvent(double prob){
     return ;
-    std::map<std::string, msg_check *>::iterator search;
- if(!failure)
- {
-   if(uniform(0,1)<prob){
-     failure=true;
-     //outGoingPacket.clear();
-     newJobsQueue.clear();
-     jobQueue.clear();
-     balanceResponses.clear();
-     reRoutedJobs.clear();
-     completedJob.clear();
-     probingMode = false;//if probingMode = true means that i am waiting for responses by other executors but if I fail I stop also the timeout
-     //thus I will never be able in the future to do probing becauset probingMode=true forever
+    if(!failure){
+        if(uniform(0,1)<prob){
+         failure=true;
+         //outGoingPacket.clear();
+         newJobsQueue.clear();
+         jobQueue.clear();
+         balanceResponses.clear();
+         reRoutedJobs.clear();
+         completedJob.clear();
+         probingMode = false;//if probingMode = true means that i am waiting for responses by other executors but if I fail I stop also the timeout
+         //thus I will never be able in the future to do probing becauset probingMode=true forever
 
-     cancelEvent(timeoutReRouted);
-     cancelEvent(timeoutJobComputation);
-     cancelEvent(timeoutLoadBalancing);
-     //cancelEvent(timeoutEndOfReRoutedExecution);
-     cancelEvent(timeoutFailureEnd);
-     scheduleAt(simTime()+timeoutFailure, timeoutFailureEnd);
-     EV<<"A failure has happened:start failure phase "<<"......"<<endl;
-     bubble("Failure");
-   }
- }
-
-
+         cancelEvent(timeoutReRouted);
+         cancelEvent(timeoutJobComputation);
+         cancelEvent(timeoutLoadBalancing);
+         //cancelEvent(timeoutEndOfReRoutedExecution);
+         cancelEvent(timeoutFailureEnd);
+         scheduleAt(simTime()+timeoutFailure, timeoutFailureEnd);
+         EV<<"A failure has happened:start failure phase "<<"......"<<endl;
+         bubble("Failure");
+        }
+    }
 }
 
 void Executor::rePopulateQueues(msg_check *msg){
@@ -325,32 +295,34 @@ void Executor::balancedJob(msg_check *msg){
 }
 
 void Executor::probeHandler(msg_check *msg){
-    msg_check *msgSend;
-    if(msg->get()==false)  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
+    msg_check *tmp;
+    if(msg->getAck()==false&&jobQueue.getLength()<msg->getQueueLength())  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
         //NO IS WRONG THIS THINKING+1 is needed in order to avoid ping pong:exe machine 5 has queue length =3 while machine 1 has length  =2... without +1 5-2 and 1-3 but if a
         //an arrival comes in 3
-        msgSend = msg->dup();
-        msgSend->setAck(true);
-        msgSend->setStatusRequest(false);  //set message priority
-        msgSend->setProbing(true);
-        msgSend->setReRouted(false);
-        EV<<"The machine "<<msgSend->getOriginalExecId()<<" has a queue "<<msgSend->getQueueLength()<<" than the one in this machine which has queue length="<<jobQueue.getLength()<<endl;
-        msgSend->setQueueLength(jobQueue.getLength());
+        tmp = msg->dup();
+        tmp->setAck(true);
+        tmp->setStatusRequest(false);  //set message priority
+        tmp->setProbing(true);
+        tmp->setReRouted(false);
+        EV<<"The machine "<<tmp->getOriginalExecId()<<" has a queue "<<tmp->getQueueLength()<<" than the one in this machine which has queue length="<<jobQueue.getLength()<<endl;
+        tmp->setQueueLength(jobQueue.getLength());
         failureEvent(probCrashDuringExecution);
         if(failure){
             EV<<"crash in the middle of sending probing response "<<endl;
             return;
         }
-        send(msgSend,"load_send",msgSend->getOriginalExecId());
-        }
+        send(tmp,"load_send",tmp->getOriginalExecId());
+    }
     else{
         /*
          D)The Original exec has received the reply from another executor:
              ->It will extract the QueueLength field of the packet and store it
 
          * */
-        balanceResponses.insert(msg->dup());
-        EV<<"store load reply from "<< msg->getActualExecId()<<endl;
+        if(strcmp(check_and_cast<msg_check *>(newJobsQueue.front())->getName(),msg->getName())==0){
+            balanceResponses.insert(msg->dup());
+            EV<<"store load reply from "<< msg->getActualExecId()<<endl;
+        }
     }
 }
 
@@ -370,17 +342,18 @@ void Executor::reRoutedHandler(msg_check *msg){
             return;
         }
         send(msgSend,"load_send",msgSend->getOriginalExecId());
+        if(!checkDuplicate(msg)){
+            jobQueue.insert(msg->dup());
+            //EV<<"Insert jobQueue in storage"<<endl;
+            msgSend=msg->dup();
+            msgSend->setJobQueue(true);
+            send(msgSend,"backup_send$o");
 
-        jobQueue.insert(msg->dup());
-        //EV<<"Insert jobQueue in storage"<<endl;
-        msgSend=msg->dup();
-        msgSend->setJobQueue(true);
-        send(msgSend,"backup_send$o");
-
-        if(!timeoutJobComputation->isScheduled()){
-             timeoutJobComplexity = msgSend->getJobComplexity();
-             EV<<"The new executor is idle:it starts executing immediately the packet"<<endl;
-             scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
+            if(!timeoutJobComputation->isScheduled()){
+                 timeoutJobComplexity = msgSend->getJobComplexity();
+                 EV<<"The new executor is idle:it starts executing immediately the packet"<<endl;
+                 scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
+            }
         }
         EV<<"new job in the queue, actual length: "<< jobQueue.getLength()<<endl;
    }
@@ -414,7 +387,6 @@ void Executor::statusRequestHandler(msg_check *msg){
     int portId;
     const char *jobId;
     jobId = msg->getName();
-    EV<<"mi sta chiedendo "<<jobId<<endl;
     if(msg->getAck()==true){
       EV << "ACK received for "<<jobId<<endl;
       if(msg->getReRouted()==true){
@@ -531,23 +503,12 @@ void Executor::newJob(msg_check *msg){
     EV<<"First time the packet is in the cluster:define his "<<id<<endl;
     msg->setNewJob(false);
 
-/*
     if(!jobQueue.getLength()){
-        jobQueue.insert(msg->dup());
-        EV<<"IInsert job queue in storage"<<endl;
-        msgSend=msg->dup();
-        msgSend->setJobQueue(true);
-        send(msgSend,"backup_send$o");
-        */
-
-    if(!jobQueue.getLength()){
-        //tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
         jobQueue.insert(msg->dup());
         //EV<<"IInsert job queue in storage"<<endl;
         msgSend=msg->dup();
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
-        //delete tmp;
 
         if(!timeoutJobComputation->isScheduled()){
             timeoutJobComplexity = msg->getJobComplexity();
@@ -638,6 +599,7 @@ void Executor::timeoutLoadBalancingHandler(){
 }
 
 void Executor::timeoutJobExecutionHandler(){
+    return;
     std::string jobId;
     int portId;
     simtime_t timeoutJobComplexity;
@@ -659,19 +621,11 @@ void Executor::timeoutJobExecutionHandler(){
 */
     //EV<<"Notify end of execution to storage"<<endl;
     msgSend= msgServiced->dup();
-    msgSend->setJobQueue(true);//dovrebbe essere implicito
+    msgSend->setJobQueue(true);
     send(msgSend,"backup_send$o");
-
-
     msgSend= msgServiced->dup();
-
     send(msgSend,"backup_send$o");
-
     completedJob.add(msgServiced);//also in original exec add it
-
-
-
-
     /*
     B)Then the executor decides which packet it should process next:
       ->If his queue is empty no computation is performed:the executor goes idle until a new packet comes
