@@ -24,11 +24,11 @@ protected:
     virtual void initialize() override;
     virtual void handleMessage(cMessage *cmsg) override;
     virtual void finish() override;
-    simsignal_t avgJobSignal;
-    simsignal_t avgNewSignal;
-    simsignal_t whyNotWorkSignal;
-   // simsignal_t avgReRoutedSignal;
-    //simsignal_t avgCompletedSignal;
+    simsignal_t JobSignal;
+    simsignal_t NewSignal;
+    //simsignal_t whyNotWorkSignal;
+    simsignal_t ReRoutedSignal;
+    simsignal_t CompletedSignal;
 
 public:
 
@@ -66,17 +66,17 @@ Storage::~Storage()
      ->The map function jobQueue that contains all the messages waiting to be processed by that executor
  */
 void Storage::initialize() {
-    avgJobSignal = registerSignal("avgJob");
-    avgNewSignal = registerSignal("avgNew");
-    whyNotWorkSignal = registerSignal("whyNotWork");
-    //avgReRoutedSignal = registerSignal("avgReRouted");
-    //avgCompletedSignal = registerSignal("avgCompleted");
-    emit(avgJobSignal, 0);
-    emit(avgNewSignal, 0);
-    totale=0;
-    emit(whyNotWorkSignal,totale);
-   // emit(avgReRoutedSignal, 0);
-    //emit(avgCompletedSignal, 0);
+    JobSignal = registerSignal("Job");
+    NewSignal = registerSignal("NewJobs");
+    //whyNotWorkSignal = registerSignal("whyNotWork");
+    ReRoutedSignal = registerSignal("ReRouted");
+    CompletedSignal = registerSignal("Completed");
+    emit(JobSignal, 0);
+    emit(NewSignal, 0);
+    //totale=0;
+    //emit(whyNotWorkSignal,totale);
+    emit(ReRoutedSignal, 0);
+    emit(CompletedSignal, 0);
 
 
 
@@ -86,8 +86,8 @@ void Storage::handleMessage(cMessage *cmsg) {
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
    msg_check *msgBackup;
    std::string jobId;
-   totale++;
-   emit(whyNotWorkSignal,totale);
+   //totale++;
+   //emit(whyNotWorkSignal,totale);
    double jobIdLength,newJobIdLength,reRoutedJobIdLength,completedJobIdLength;
 
    jobId.append(std::to_string(msg->getOriginalExecId()));
@@ -112,28 +112,28 @@ void Storage::handleMessage(cMessage *cmsg) {
            searchMessage(jobId,msg,&newJobsQueue);
            EV<<"working on NEWJOB map for: "<<jobId<<endl;
            newJobIdLength=newJobsQueue.size();
-           emit(avgNewSignal,newJobIdLength);
+           emit(NewSignal,newJobIdLength);
            EV<<"   "<<newJobIdLength<<endl;
          }else if(msg->getJobQueue()==true){
                    msg->setJobQueue(true);
                    searchMessage(jobId,msg,&jobQueue);
                    EV<<"working on JOBID map for: "<<jobId<<endl;
                    jobIdLength=jobQueue.size();
-                   emit(avgJobSignal,jobIdLength);
+                   emit(JobSignal,jobIdLength);
                    EV<<"   "<<jobIdLength<<endl;
                 }else if(msg->getReRoutedJobQueue()==true){
                            msg->setReRoutedJobQueue(true);
                            searchMessage(jobId,msg,&reRoutedQueue);
                            EV<<"working on REROUTED map for: "<<jobId<<endl;
                            reRoutedJobIdLength=reRoutedQueue.size();
-                           //emit(avgReRoutedSignal,reRoutedJobIdLength);
+                           emit(ReRoutedSignal,reRoutedJobIdLength);
                            EV<<"   "<<reRoutedJobIdLength<<endl;
                        }else if(msg->getCompletedQueue()==true){
                                    msg->setCompletedQueue(true);
                                    searchMessage(jobId,msg,&completedJobQueue);
                                    EV<<"working on ENDED JOBS map for: "<<jobId<<endl;
                                    completedJobIdLength=completedJobQueue.size();
-                                   //emit(avgCompletedSignal,completedJobIdLength);
+                                   emit(CompletedSignal,completedJobIdLength);
                                    EV<<"   "<<completedJobIdLength<<endl;
            }
 
