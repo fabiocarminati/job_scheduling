@@ -82,7 +82,7 @@ void Client::initialize() {
 }
 
 void Client::handleMessage(cMessage *cmsg) {
-    int destinationPort;
+    int destinationMachine;
     simtime_t interArrivalTime;
     // Casting from cMessage to msg_check
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
@@ -95,8 +95,8 @@ void Client::handleMessage(cMessage *cmsg) {
                 if(msg->getAck()==true){
                     if(msg->getIsEnded()==true){
                         EV<<"Completed: "<<jobId<<endl;
-                        destinationPort = msg->getOriginalExecId();
-                        send(msg->dup(),"user$o",destinationPort);
+                        destinationMachine = msg->getOriginalExecId();
+                        send(msg->dup(),"user$o",destinationMachine);
                         //delete the job from the list of the job currently in processing
                         delete workInProgress.remove(jobId);
                     }
@@ -131,24 +131,24 @@ void Client::jobStatusHandler(){
     int i;
     msg_check *message;
     cObject *obj;
-    int destinationPort;
+    int destinationMachine;
     for (i = 0;i < workInProgress.size();i++){
          obj = workInProgress.get(i);
          if(obj!=nullptr){
             message = check_and_cast<msg_check *>(obj);
             message = message->dup();
             message->setStatusRequest(true);
-            destinationPort = message->getOriginalExecId();
+            destinationMachine = message->getOriginalExecId();
             EV<<"Asking the status of: "<<message->getOriginalExecId()<<"-"<<message->getRelativeJobId()<<endl;
-            send(message,"user$o",destinationPort);
+            send(message,"user$o",destinationMachine);
         }
     }
     scheduleAt(simTime() + timeoutStatus, checkJobStatus);
 }
 
 void Client::selfMessage(msg_check *msg){
-    int destinationPort;
     int destinationMachine;
+
     msg_check *message;
     simtime_t jobComplexity;
 
@@ -158,8 +158,9 @@ void Client::selfMessage(msg_check *msg){
         sprintf(msgname, "message%d-#%d", sourceID, nbGenMessages);
 
         //select the executor among a set of uniform values
-        destinationMachine=uniform(N+2,N+E+1);
-        destinationPort=destinationMachine-N-2;
+        destinationMachine=rand() % E;
+        //destinationMachine=uniform(N+2,N+E+1);
+
         message = new msg_check(msgname);
         message->setStatusRequest(false);
         message->setProbing(false);
@@ -169,17 +170,17 @@ void Client::selfMessage(msg_check *msg){
         EV<<"job complexity "<<jobComplexity<<endl;
         message->setRelativeJobId(0); //will be useful for computing the per class extended service time
         message->setClientId(sourceID);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
-        message->setActualExecId(destinationPort);
-        message->setOriginalExecId(destinationPort);
+        message->setActualExecId(destinationMachine);
+        message->setOriginalExecId(destinationMachine);
         message->setQueueLength(0);
         message->setReRouted(false);
         message->setIsEnded(false);
         message->setAck(false);
         message->setNewJob(true);
         message->setReBoot(false);
-        EV<<"msg sent to machine "<<destinationMachine<<" with user-output port "<<destinationPort<<endl;
+        EV<<"msg sent to machine "<<destinationMachine<<endl;
         msg_to_ack=message->dup();
-        send(message,"user$o",destinationPort);  //send the message to the queue
+        send(message,"user$o",destinationMachine);  //send the message to the queue
         scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);//waiting ack
 
     }
