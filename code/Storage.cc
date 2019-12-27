@@ -16,7 +16,7 @@ private:
     double totale;
     void searchMessage(std::string jobId,  msg_check *msg, std::map<std::string, msg_check *> *storedMap);
     void executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap);
-
+    simtime_t channelDelay;
 
 
 
@@ -77,8 +77,9 @@ void Storage::initialize() {
     //emit(whyNotWorkSignal,totale);
     emit(ReRoutedSignal, 0);
     emit(CompletedSignal, 0);
+    channelDelay = par("channelDelay");
 
-
+    //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
 
 }
 void Storage::handleMessage(cMessage *cmsg) {

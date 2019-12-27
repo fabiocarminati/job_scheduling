@@ -14,6 +14,7 @@ private:
     msg_check *timeoutFailureEnd;
     //msg_check *timeoutEndOfReRoutedExecution;
 
+    simtime_t channelDelay;
     simtime_t timeoutLoad;
     simtime_t timeoutFailure;
     simtime_t timeoutEndActual;
@@ -70,8 +71,13 @@ Executor::~Executor()
 
 void Executor::initialize() {
     probingMode = false;
-    N= par("N");
+    N = par("N");
     E = par("E"); //non volatile parameters --once defined they never change
+    channelDelay = par("channelDelay");
+    timeoutLoad = par("timeoutLoad")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
+    timeoutFailure = par("timeoutFailure")+2*channelDelay;
+    timeoutEndActual = par("timeoutEndActual")+2*channelDelay;
+    EV<<"load "<<timeoutLoad<<" failure "<<timeoutFailure<<" end "<<timeoutEndActual<<endl;
     myId=getId()-2-N;
     nArrived=0;
 
@@ -86,9 +92,9 @@ void Executor::initialize() {
     timeoutFailureEnd = new msg_check("timeoutFailureEnd");
     //timeoutEndOfReRoutedExecution = new msg_check("timeout actual exec notifies end of execution to original exec");
 
-    timeoutLoad=0.1;
-    timeoutFailure=0.1;
-    timeoutEndActual=0.2;
+
+
+
 }
 void Executor::handleMessage(cMessage *cmsg) {
 

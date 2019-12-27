@@ -14,8 +14,9 @@ private:
   msg_check *timeoutAckNewJob;
   msg_check *checkJobStatus;
   msg_check *msg_to_ack;
-  simtime_t timeout;
+  simtime_t timeoutAck;
   simtime_t timeoutStatus;
+  simtime_t channelDelay;
 
   bool startCheckJobStatus;
   cArray workInProgress;
@@ -48,11 +49,20 @@ Client::~Client()
 }
 
 void Client::initialize() {
-    avgSendingRateSignal = registerSignal("avgSendingRate");
-    avgComplexitySignal = registerSignal("avgComplexity");
     //initializing variables
     simtime_t interArrivalTime;
+
+    channelDelay= par("channelDelay");
+    timeoutAck=par("timeoutAck")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
+    timeoutStatus=par("timeoutStatus")+2*channelDelay;
+    EV<<"ack "<<timeoutAck<<" status "<<timeoutStatus<<endl;
+    E = par("E"); //non volatile parameters --once defined they never change
+    N = par("N");
     interArrivalTime=exponential(par("interArrivalTime").doubleValue()); //simulate an exponential generation of packets
+
+    avgSendingRateSignal = registerSignal("avgSendingRate");
+    avgComplexitySignal = registerSignal("avgComplexity");
+
     emit(avgSendingRateSignal,interArrivalTime);
 
 
@@ -61,14 +71,11 @@ void Client::initialize() {
     timeoutAckNewJob = new msg_check("timeoutAckNewJob");
     checkJobStatus = new msg_check("checkJobStatus");
     nbGenMessages=0;
-    timeout=0.5;
-    timeoutStatus=1;
     sourceID=getId()-1;   //defines the Priority-ID of the message that each source will transmit(different sources send different priorities messages)
     //EV<<"Client ID "<<sourceID<<endl;
     scheduleAt(simTime() + timeoutStatus, checkJobStatus);
     scheduleAt(simTime() + interArrivalTime, sendNewJob);
-    E = par("E"); //non volatile parameters --once defined they never change
-    N = par("N");
+
 
 
 
@@ -173,7 +180,7 @@ void Client::selfMessage(msg_check *msg){
         EV<<"msg sent to machine "<<destinationMachine<<" with user-output port "<<destinationPort<<endl;
         msg_to_ack=message->dup();
         send(message,"user$o",destinationPort);  //send the message to the queue
-        scheduleAt(simTime()+timeout, timeoutAckNewJob);//waiting ack
+        scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);//waiting ack
 
     }
     else
@@ -182,7 +189,7 @@ void Client::selfMessage(msg_check *msg){
             EV << "Timeout expired, re-sending message and restarting timer\n";
             send(msg_to_ack->dup(),"user$o",msg_to_ack->getOriginalExecId());
             //start the timeout for the re-transmission
-            scheduleAt(simTime()+timeout, timeoutAckNewJob);
+            scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);
             }
         else
            if(msg == checkJobStatus){

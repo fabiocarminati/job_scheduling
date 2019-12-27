@@ -6,7 +6,7 @@ simple Storage
 		    @display("i=block/sink");
 		//int N;
         int E;
-		
+		double channelDelay @unit(s);
         // Average queue length
         @signal[Job](type="double");
         @statistic[Job](title="JOB QUEUE";record=vector,timeavg;interpolationmode=sample-hold);

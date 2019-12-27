@@ -7,7 +7,10 @@ simple Executor
         int E;
         double probEvent;
         double probCrashDuringExecution;
-
+		double channelDelay @unit(s);
+		double timeoutLoad @unit(s);
+        double timeoutFailure @unit(s);
+        double timeoutEndActual @unit(s);
 // GENERAL STATISTICS
 
 		// Busy signal

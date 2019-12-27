@@ -3,6 +3,7 @@ network Net
     parameters:
         int N;
         int E;
+        double channelDelay @unit(s);
       
         @display("bgb=718,496");
         @figure[description](type=text; pos=5,20; font=,,bold; text="Distributed job scheduling");
@@ -40,16 +41,16 @@ network Net
     connections:
         for i=0..N-1, for j=0..E-1 {
             // client[i].out --> queue.in++;
-            client[i].user[j] <--> executor[j].exec[i];
+            client[i].user[j] <--> {delay = channelDelay;} <--> executor[j].exec[i];
 
         }
         for k=0..E-1 {
             // client[i].out --> queue.in++;
-            executor[k].backup_send <--> backup[k].backup_rec;
+            executor[k].backup_send <--> {delay = channelDelay;} <--> backup[k].backup_rec;
 
         }
         for k=0..E-1, for r=0..E-1 {
-            executor[k].load_send[r] --> executor[r].load_receive[k];
+            executor[k].load_send[r] --> {delay = channelDelay;} --> executor[r].load_receive[k];
 
         }
 
