@@ -18,4 +18,5 @@ packet msg_check //name of the new type of message
     bool ReRoutedJobQueue;
     bool BackupComplete;
     bool CompletedQueue;
+    bool Duplicate;
 };

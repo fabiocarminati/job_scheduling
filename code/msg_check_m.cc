@@ -199,6 +199,7 @@ msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kin
     this->ReRoutedJobQueue = false;
     this->BackupComplete = false;
     this->CompletedQueue = false;
+    this->Duplicate = false;
 }
 
 msg_check::msg_check(const msg_check& other) : ::omnetpp::cPacket(other)
@@ -238,6 +239,7 @@ void msg_check::copy(const msg_check& other)
     this->ReRoutedJobQueue = other.ReRoutedJobQueue;
     this->BackupComplete = other.BackupComplete;
     this->CompletedQueue = other.CompletedQueue;
+    this->Duplicate = other.Duplicate;
 }
 
 void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
@@ -261,6 +263,7 @@ void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
     doParsimPacking(b,this->ReRoutedJobQueue);
     doParsimPacking(b,this->BackupComplete);
     doParsimPacking(b,this->CompletedQueue);
+    doParsimPacking(b,this->Duplicate);
 }
 
 void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
@@ -284,6 +287,7 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->ReRoutedJobQueue);
     doParsimUnpacking(b,this->BackupComplete);
     doParsimUnpacking(b,this->CompletedQueue);
+    doParsimUnpacking(b,this->Duplicate);
 }
 
 int msg_check::getRelativeJobId() const
@@ -466,6 +470,16 @@ void msg_check::setCompletedQueue(bool CompletedQueue)
     this->CompletedQueue = CompletedQueue;
 }
 
+bool msg_check::getDuplicate() const
+{
+    return this->Duplicate;
+}
+
+void msg_check::setDuplicate(bool Duplicate)
+{
+    this->Duplicate = Duplicate;
+}
+
 class msg_checkDescriptor : public omnetpp::cClassDescriptor
 {
   private:
@@ -531,7 +545,7 @@ const char *msg_checkDescriptor::getProperty(const char *propertyname) const
 int msg_checkDescriptor::getFieldCount() const
 {
     omnetpp::cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 18+basedesc->getFieldCount() : 18;
+    return basedesc ? 19+basedesc->getFieldCount() : 19;
 }
 
 unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
@@ -561,8 +575,9 @@ unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISEDITABLE,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<18) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<19) ? fieldTypeFlags[field] : 0;
 }
 
 const char *msg_checkDescriptor::getFieldName(int field) const
@@ -592,8 +607,9 @@ const char *msg_checkDescriptor::getFieldName(int field) const
         "ReRoutedJobQueue",
         "BackupComplete",
         "CompletedQueue",
+        "Duplicate",
     };
-    return (field>=0 && field<18) ? fieldNames[field] : nullptr;
+    return (field>=0 && field<19) ? fieldNames[field] : nullptr;
 }
 
 int msg_checkDescriptor::findField(const char *fieldName) const
@@ -618,6 +634,7 @@ int msg_checkDescriptor::findField(const char *fieldName) const
     if (fieldName[0]=='R' && strcmp(fieldName, "ReRoutedJobQueue")==0) return base+15;
     if (fieldName[0]=='B' && strcmp(fieldName, "BackupComplete")==0) return base+16;
     if (fieldName[0]=='C' && strcmp(fieldName, "CompletedQueue")==0) return base+17;
+    if (fieldName[0]=='D' && strcmp(fieldName, "Duplicate")==0) return base+18;
     return basedesc ? basedesc->findField(fieldName) : -1;
 }
 
@@ -648,8 +665,9 @@ const char *msg_checkDescriptor::getFieldTypeString(int field) const
         "bool",
         "bool",
         "bool",
+        "bool",
     };
-    return (field>=0 && field<18) ? fieldTypeStrings[field] : nullptr;
+    return (field>=0 && field<19) ? fieldTypeStrings[field] : nullptr;
 }
 
 const char **msg_checkDescriptor::getFieldPropertyNames(int field) const
@@ -734,6 +752,7 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
         case 15: return bool2string(pp->getReRoutedJobQueue());
         case 16: return bool2string(pp->getBackupComplete());
         case 17: return bool2string(pp->getCompletedQueue());
+        case 18: return bool2string(pp->getDuplicate());
         default: return "";
     }
 }
@@ -766,6 +785,7 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
         case 15: pp->setReRoutedJobQueue(string2bool(value)); return true;
         case 16: pp->setBackupComplete(string2bool(value)); return true;
         case 17: pp->setCompletedQueue(string2bool(value)); return true;
+        case 18: pp->setDuplicate(string2bool(value)); return true;
         default: return false;
     }
 }

@@ -216,6 +216,8 @@ void Executor::rePopulateQueues(msg_check *msg){
                       jobQueue.insert(msg->dup());
                       EV<<"BACKUP in new because REROUTED"<<endl;
                   }else{
+                      msg->setNewJobsQueue(true);
+                      msg->setJobQueue(false);
                       newJobsQueue.insert(msg->dup());
                       EV<<"BACKUP In the new job because has not been re routed"<<endl;
                   }
@@ -300,8 +302,8 @@ void Executor::balancedJob(msg_check *msg){
 }
 
 void Executor::probeHandler(msg_check *msg){
-    msg_check *tmp;
-    if(msg->getAck()==false&&jobQueue.getLength()<msg->getQueueLength())  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
+    msg_check *tmp,*msgSend;
+    if(msg->getAck()==false && jobQueue.getLength()<msg->getQueueLength())  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
         //NO IS WRONG THIS THINKING+1 is needed in order to avoid ping pong:exe machine 5 has queue length =3 while machine 1 has length  =2... without +1 5-2 and 1-3 but if a
         //an arrival comes in 3
         tmp = msg->dup();
@@ -309,6 +311,12 @@ void Executor::probeHandler(msg_check *msg){
         tmp->setStatusRequest(false);  //set message priority
         tmp->setProbing(true);
         tmp->setReRouted(false);
+
+        if(checkDuplicate(tmp->dup()))
+            tmp->setDuplicate(true);
+        else
+            tmp->setDuplicate(false);
+
         EV<<"The machine "<<tmp->getOriginalExecId()<<" has a queue "<<tmp->getQueueLength()<<" than the one in this machine which has queue length="<<jobQueue.getLength()<<endl;
         tmp->setQueueLength(jobQueue.getLength());
         failureEvent(probCrashDuringExecution);
@@ -327,8 +335,34 @@ void Executor::probeHandler(msg_check *msg){
        if(!newJobsQueue.isEmpty()&&strcmp(check_and_cast<msg_check *>(newJobsQueue.front())->getName(),msg->getName())==0){
            msg->setProbing(false);
            msg->setAck(false);
-           balanceResponses.insert(msg->dup());
-           EV<<"store load reply from "<< msg->getActualExecId()<<endl;
+
+           if(msg->getDuplicate()){
+               msg->setDuplicate(false);
+               tmp = check_and_cast<msg_check *>(newJobsQueue.pop()); //remove
+               tmp->setNewJobsQueue(true);//should be useless
+               send(tmp,"backup_send$o");
+
+               msgSend = msg->dup();
+               msgSend->setReRoutedJobQueue(true);
+               msgSend->setNewJobsQueue(false);
+
+               reRoutedJobs.add(msgSend->dup());
+               send(msgSend,"backup_send$o");
+               probingMode = false;
+               balanceResponses.clear();
+               cancelEvent(timeoutLoadBalancing);
+
+               if(newJobsQueue.getLength()>0){
+                   tmp = check_and_cast<msg_check *>(newJobsQueue.front());
+                   balancedJob(tmp);
+               }
+               //TO
+
+           }
+           else{
+               balanceResponses.insert(msg->dup());
+               EV<<"store load reply from "<< msg->getActualExecId()<<endl;
+           }
        }
     }
 }
@@ -350,10 +384,11 @@ void Executor::reRoutedHandler(msg_check *msg){
         }
         send(msgSend,"load_send",msgSend->getOriginalExecId());
         if(!checkDuplicate(msg)){
+            msg->setJobQueue(true);
             jobQueue.insert(msg->dup());
             //EV<<"Insert jobQueue in storage"<<endl;
             msgSend=msg->dup();
-            msgSend->setJobQueue(true);
+
             send(msgSend,"backup_send$o");
 
             if(!timeoutJobComputation->isScheduled()){
@@ -373,6 +408,7 @@ void Executor::reRoutedHandler(msg_check *msg){
         actualExecId = msg->getActualExecId();
         tmp->setActualExecId(actualExecId);
 
+        tmp->setNewJobsQueue(false);
         tmp->setReRoutedJobQueue(true);
         msgSend=tmp->dup();
         //EV<<"Send to the backup reroutedjobqueue add event "<<endl;
@@ -510,10 +546,10 @@ void Executor::newJob(msg_check *msg){
     EV<<"First time the packet is in the cluster:define his "<<id<<endl;
     msg->setNewJob(false);
     if(!jobQueue.getLength()){
+        msg->setJobQueue(true);
         jobQueue.insert(msg->dup());
         //EV<<"IInsert job queue in storage"<<endl;
         msgSend=msg->dup();
-        msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
 
         if(!timeoutJobComputation->isScheduled()){
@@ -523,8 +559,8 @@ void Executor::newJob(msg_check *msg){
         }
     }
     else{
+        msg->setNewJobsQueue(true);
         msgSend=msg->dup();
-        msgSend->setNewJobsQueue(true);
        // EV<<"Send to the backup info about original "<<msgSend->getOriginalExecId()<<" and actual "<<msgSend->getActualExecId()<<" of the "<<id<<endl;
         send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
         newJobsQueue.insert(msg->dup());
@@ -576,6 +612,8 @@ void Executor::timeoutLoadBalancingHandler(){
             EV<<"load balancing is useless and i am idle indeeed jobQueue length "<<jobQueue.getLength()<<endl;
             scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
         }
+        tmp->setNewJobsQueue(false);
+        tmp->setJobQueue(true);
         jobQueue.insert(tmp);
         probingMode = false;
          if(newJobsQueue.getLength()>0){
@@ -618,7 +656,7 @@ void Executor::timeoutJobExecutionHandler(){
     jobId.append(std::to_string(msgServiced->getRelativeJobId()));
     portId = msgServiced->getClientId()-1;  //Source id-1=portId
     EV<<"Completed job: "<<jobId<<" creating by the user ID "<<portId<<endl;
-    msgServiced->setCompletedQueue(true);
+
     /*if(msgServiced->getReRouted()==true){
          msgSend= msgServiced->dup();
          send(msgSend,"load_send",msgSend->getOriginalExecId());
@@ -629,8 +667,11 @@ void Executor::timeoutJobExecutionHandler(){
     msgSend= msgServiced->dup();
     msgSend->setJobQueue(true);
     send(msgSend,"backup_send$o");
+
+    msgServiced->setCompletedQueue(true);
     msgSend= msgServiced->dup();
     send(msgSend,"backup_send$o");
+
     completedJob.add(msgServiced);//also in original exec add it
     /*
     B)Then the executor decides which packet it should process next:

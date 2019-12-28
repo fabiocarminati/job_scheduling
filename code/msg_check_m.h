@@ -41,6 +41,7 @@
  *     bool ReRoutedJobQueue;
  *     bool BackupComplete;
  *     bool CompletedQueue;
+ *     bool Duplicate;
  * }
  * </pre>
  */
@@ -65,6 +66,7 @@ class msg_check : public ::omnetpp::cPacket
     bool ReRoutedJobQueue;
     bool BackupComplete;
     bool CompletedQueue;
+    bool Duplicate;
 
   private:
     void copy(const msg_check& other);
@@ -119,6 +121,8 @@ class msg_check : public ::omnetpp::cPacket
     virtual void setBackupComplete(bool BackupComplete);
     virtual bool getCompletedQueue() const;
     virtual void setCompletedQueue(bool CompletedQueue);
+    virtual bool getDuplicate() const;
+    virtual void setDuplicate(bool Duplicate);
 };
 
 inline void doParsimPacking(omnetpp::cCommBuffer *b, const msg_check& obj) {obj.parsimPack(b);}
