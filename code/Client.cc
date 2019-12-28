@@ -196,7 +196,4 @@ void Client::selfMessage(msg_check *msg){
            if(msg == checkJobStatus){
              jobStatusHandler();
            }
-
-
-
 }

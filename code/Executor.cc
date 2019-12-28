@@ -324,10 +324,12 @@ void Executor::probeHandler(msg_check *msg){
              ->It will extract the QueueLength field of the packet and store it
 
          * */
-        if(strcmp(check_and_cast<msg_check *>(newJobsQueue.front())->getName(),msg->getName())==0){
-            balanceResponses.insert(msg->dup());
-            EV<<"store load reply from "<< msg->getActualExecId()<<endl;
-        }
+       if(!newJobsQueue.isEmpty()&&strcmp(check_and_cast<msg_check *>(newJobsQueue.front())->getName(),msg->getName())==0){
+           msg->setProbing(false);
+           msg->setAck(false);
+           balanceResponses.insert(msg->dup());
+           EV<<"store load reply from "<< msg->getActualExecId()<<endl;
+       }
     }
 }
 
@@ -338,7 +340,7 @@ void Executor::reRoutedHandler(msg_check *msg){
     if(msg->getAck()==false)  {//the actual exec has received the packet;notifies the original exec
         msgSend = msg->dup();
         msgSend->setAck(true);
-        msgSend->setStatusRequest(false);  //set message priority
+        msgSend->setStatusRequest(false);
         msgSend->setProbing(false);
         msgSend->setReRouted(true);
         failureEvent(probCrashDuringExecution);
@@ -507,7 +509,6 @@ void Executor::newJob(msg_check *msg){
     send(msgSend,"exec$o",port_id);
     EV<<"First time the packet is in the cluster:define his "<<id<<endl;
     msg->setNewJob(false);
-
     if(!jobQueue.getLength()){
         jobQueue.insert(msg->dup());
         //EV<<"IInsert job queue in storage"<<endl;
