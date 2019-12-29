@@ -179,7 +179,6 @@ bool Executor::checkDuplicate(msg_check *msg){
 }
 
 void Executor::failureEvent(double prob){
-    return ;
     if(!failure){
         if(uniform(0,1)<prob){
          failure=true;

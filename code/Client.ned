@@ -10,6 +10,7 @@ simple Client
         @display("i=block/source");
         int N;
         int E;
+        int maxRetry;
         @signal[avgSendingRate](type="simtime_t");
         @statistic[avgSendingRate](title="INTERARRIVAL RATE";record=vector, timeavg;interpolationmode=sample-hold);
       	

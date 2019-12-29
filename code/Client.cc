@@ -10,6 +10,7 @@ private:
   int sourceID;
   int nbGenMessages;
   int N,E;
+  int maxRetry;
   msg_check *sendNewJob;
   msg_check *timeoutAckNewJob;
   msg_check *checkJobStatus;
@@ -59,6 +60,7 @@ void Client::initialize() {
     E = par("E"); //non volatile parameters --once defined they never change
     N = par("N");
     interArrivalTime=exponential(par("interArrivalTime").doubleValue()); //simulate an exponential generation of packets
+    maxRetry=par("maxRetry");
 
     avgSendingRateSignal = registerSignal("avgSendingRate");
     avgComplexitySignal = registerSignal("avgComplexity");
@@ -82,7 +84,7 @@ void Client::initialize() {
 }
 
 void Client::handleMessage(cMessage *cmsg) {
-    int destinationMachine;
+    int executor;
     simtime_t interArrivalTime;
     // Casting from cMessage to msg_check
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
@@ -95,8 +97,8 @@ void Client::handleMessage(cMessage *cmsg) {
                 if(msg->getAck()==true){
                     if(msg->getIsEnded()==true){
                         EV<<"Completed: "<<jobId<<endl;
-                        destinationMachine = msg->getOriginalExecId();
-                        send(msg->dup(),"user$o",destinationMachine);
+                        executor = msg->getOriginalExecId();
+                        send(msg->dup(),"user$o",executor);
                         //delete the job from the list of the job currently in processing
                         delete workInProgress.remove(jobId);
                     }
@@ -131,35 +133,37 @@ void Client::jobStatusHandler(){
     int i;
     msg_check *message;
     cObject *obj;
-    int destinationMachine;
+    int executor;
     for (i = 0;i < workInProgress.size();i++){
          obj = workInProgress.get(i);
          if(obj!=nullptr){
             message = check_and_cast<msg_check *>(obj);
             message = message->dup();
             message->setStatusRequest(true);
-            destinationMachine = message->getOriginalExecId();
+            executor = message->getOriginalExecId();
             EV<<"Asking the status of: "<<message->getOriginalExecId()<<"-"<<message->getRelativeJobId()<<endl;
-            send(message,"user$o",destinationMachine);
+            send(message,"user$o",executor);
         }
     }
     scheduleAt(simTime() + timeoutStatus, checkJobStatus);
 }
 
 void Client::selfMessage(msg_check *msg){
-    int destinationMachine;
+    int executor;
 
     msg_check *message;
     simtime_t jobComplexity;
 
     if (msg == sendNewJob){
+        maxRetry=par("maxRetry");
+        //EV<<"maxRetry in normal mode "<<maxRetry<<endl;
         char msgname[20];
         ++nbGenMessages; //Total number of packets sent by a specific source(thus with the same priority) up to now
         sprintf(msgname, "message%d-#%d", sourceID, nbGenMessages);
 
         //select the executor among a set of uniform values
-        destinationMachine=rand() % E;
-        //destinationMachine=uniform(N+2,N+E+1);
+        executor=rand() % E;
+        //executor=uniform(N+2,N+E+1);
 
         message = new msg_check(msgname);
         message->setStatusRequest(false);
@@ -170,28 +174,41 @@ void Client::selfMessage(msg_check *msg){
         EV<<"job complexity "<<jobComplexity<<endl;
         message->setRelativeJobId(0); //will be useful for computing the per class extended service time
         message->setClientId(sourceID);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
-        message->setActualExecId(destinationMachine);
-        message->setOriginalExecId(destinationMachine);
+        message->setActualExecId(executor);
+        message->setOriginalExecId(executor);
         message->setQueueLength(0);
         message->setReRouted(false);
         message->setIsEnded(false);
         message->setAck(false);
         message->setNewJob(true);
         message->setReBoot(false);
-        EV<<"msg sent to machine "<<destinationMachine<<endl;
+        EV<<"msg sent to machine "<<executor<<endl;
         msg_to_ack=message->dup();
-        send(message,"user$o",destinationMachine);  //send the message to the queue
+        send(message,"user$o",executor);  //send the message to the queue
         scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);//waiting ack
 
     }
     else
         //if the message is a timeout event the message it is re-sent to the executor
         if (msg==timeoutAckNewJob) {
+
+            if(maxRetry)
+                maxRetry--;
+            else{
+               maxRetry=par("maxRetry");
+               executor=rand() % E;
+               while(executor==msg_to_ack->getOriginalExecId())
+                   executor=rand() % E;
+               msg_to_ack->setActualExecId(executor);
+               msg_to_ack->setOriginalExecId(executor);
+               EV<<"Change destination executor "<<endl;
+            }
+            //EV<<"maxretry when ack expired "<<maxRetry<<endl;
             EV << "Timeout expired, re-sending message and restarting timer\n";
             send(msg_to_ack->dup(),"user$o",msg_to_ack->getOriginalExecId());
             //start the timeout for the re-transmission
             scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);
-            }
+        }
         else
            if(msg == checkJobStatus){
              jobStatusHandler();
