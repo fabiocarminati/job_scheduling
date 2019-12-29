@@ -162,8 +162,10 @@ void Client::selfMessage(msg_check *msg){
         sprintf(msgname, "message%d-#%d", sourceID, nbGenMessages);
 
         //select the executor among a set of uniform values
+
         executor=rand() % E;
-        //executor=uniform(N+2,N+E+1);
+
+
 
         message = new msg_check(msgname);
         message->setStatusRequest(false);

@@ -20,7 +20,7 @@ private:
     simtime_t timeoutEndActual;
 
     int E,N,nArrived,myId;
-    double probEvent,probCrashDuringExecution;
+    double probEvent,probCrashDuringExecution,jobCompleted;
     bool probingMode,failure;
 
     cArray completedJob;
@@ -44,6 +44,7 @@ private:
 protected:
     virtual void initialize();// override;
     virtual void handleMessage(cMessage *cmsg);// override;
+    virtual void finish();
 
 public:
   simtime_t interArrivalTime;
@@ -80,7 +81,7 @@ void Executor::initialize() {
     EV<<"load "<<timeoutLoad<<" failure "<<timeoutFailure<<" end "<<timeoutEndActual<<endl;
     myId=getId()-2-N;
     nArrived=0;
-
+    jobCompleted=0;
     probEvent=par("probEvent");
     probCrashDuringExecution=par("probCrashDuringExecution");
     failure=false;
@@ -274,7 +275,7 @@ void Executor::balancedJob(msg_check *msg){
     int i;
     int src_id;
     src_id=msg->getClientId();
-    EV<<"msg ID "<<msg->getRelativeJobId()<<" coming from user ID "<<src_id-1<<" trying to distribute"<<endl;
+    EV<<"msg ID "<<msg->getRelativeJobId()<<" coming from user ID "<<src_id-1<<" trying to distribute probing mode "<<probingMode<<endl;
     if(!probingMode){  //==-1 means that the coming msg has been forwarded by another machine after load balancing
         msg->setStatusRequest(false);
         msg->setProbing(true);
@@ -384,7 +385,8 @@ void Executor::reRoutedHandler(msg_check *msg){
         send(msgSend,"load_send",msgSend->getOriginalExecId());
         if(!checkDuplicate(msg)){
             msg->setJobQueue(true);
-            jobQueue.insert(msg->dup());
+            msg->setNewJobsQueue(false);
+            jobQueue.insert(msg->dup());//not in new job otherwise will redo load balancing:wrong
             //EV<<"Insert jobQueue in storage"<<endl;
             msgSend=msg->dup();
 
@@ -413,6 +415,7 @@ void Executor::reRoutedHandler(msg_check *msg){
         //EV<<"Send to the backup reroutedjobqueue add event "<<endl;
         send(msgSend,"backup_send$o");
         reRoutedJobs.add(tmp);
+        probingMode = false;
         if(newJobsQueue.getLength()>0){
             tmp = check_and_cast<msg_check *>(newJobsQueue.front());
             balancedJob(tmp);
@@ -627,6 +630,7 @@ void Executor::timeoutLoadBalancingHandler(){
         tmp->setReRouted(true);
         tmp->setQueueLength(-1);
         tmp->setActualExecId(actualExec);
+        tmp->setNewJobsQueue(false);
         bubble("Load balancing");
         EV<<"Send to the machine "<<actualExec<<" that has a lower queue the "<<tmp->getRelativeJobId()<<endl;
         failureEvent(probCrashDuringExecution);
@@ -642,7 +646,7 @@ void Executor::timeoutLoadBalancingHandler(){
 }
 
 void Executor::timeoutJobExecutionHandler(){
-    return;
+
     std::string jobId;
     int portId;
     simtime_t timeoutJobComplexity;
@@ -655,7 +659,7 @@ void Executor::timeoutJobExecutionHandler(){
     jobId.append(std::to_string(msgServiced->getRelativeJobId()));
     portId = msgServiced->getClientId()-1;  //Source id-1=portId
     EV<<"Completed job: "<<jobId<<" creating by the user ID "<<portId<<endl;
-
+    jobCompleted++;
     /*if(msgServiced->getReRouted()==true){
          msgSend= msgServiced->dup();
          send(msgSend,"load_send",msgSend->getOriginalExecId());
@@ -668,6 +672,7 @@ void Executor::timeoutJobExecutionHandler(){
     send(msgSend,"backup_send$o");
 
     msgServiced->setCompletedQueue(true);
+    msgServiced->setJobQueue(false);
     msgSend= msgServiced->dup();
     send(msgSend,"backup_send$o");
 
@@ -703,6 +708,7 @@ void Executor::selfMessage(msg_check *msg){
        if(newJobsQueue.getLength()>0){
            EV<<"The load balancing receiver is down;load balancing non performed correctly"<<endl;
            msgServiced = check_and_cast<msg_check *>(newJobsQueue.front());
+           probingMode = false;
            balancedJob(msgServiced);
        }
     }
@@ -730,6 +736,7 @@ void Executor::selfMessage(msg_check *msg){
 
            if (msg == timeoutJobComputation){
               timeoutJobExecutionHandler();
+
            }
            /*else
                if(msg==timeoutEndOfReRoutedExecution){
@@ -737,3 +744,7 @@ void Executor::selfMessage(msg_check *msg){
 
                }*/
 }
+void Executor::finish()
+{
+    EV<<"completed jobs "<<jobCompleted<<endl;
+    }
