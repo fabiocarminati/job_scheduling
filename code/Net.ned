@@ -26,11 +26,7 @@ network Net
                 load_receive[E];
                 load_send[E];
         }
-		//decido di fare delete del msg direttamente nelle queue
-        //sink: Sink {
-        //    parameters:
-        //        @display("p=634,245");
-        //}
+
         backup[E]: Storage {
             parameters:
                 @display("p=150,90,m,90");
@@ -45,7 +41,7 @@ network Net
 
         }
         for k=0..E-1 {
-            // client[i].out --> queue.in++;
+
             executor[k].backup_send <--> {delay = channelDelay;} <--> backup[k].backup_rec;
 
         }

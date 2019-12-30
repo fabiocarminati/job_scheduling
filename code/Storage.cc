@@ -28,7 +28,7 @@ protected:
     simsignal_t NewSignal;
     //simsignal_t whyNotWorkSignal;
     simsignal_t ReRoutedSignal;
-    simsignal_t CompletedSignal;
+
 
 public:
 
@@ -70,13 +70,11 @@ void Storage::initialize() {
     NewSignal = registerSignal("NewJobs");
     //whyNotWorkSignal = registerSignal("whyNotWork");
     ReRoutedSignal = registerSignal("ReRouted");
-    CompletedSignal = registerSignal("Completed");
     emit(JobSignal, 0);
     emit(NewSignal, 0);
     //totale=0;
     //emit(whyNotWorkSignal,totale);
     emit(ReRoutedSignal, 0);
-    emit(CompletedSignal, 0);
     channelDelay = par("channelDelay");
 
     //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
@@ -134,7 +132,6 @@ void Storage::handleMessage(cMessage *cmsg) {
                                    searchMessage(jobId,msg,&completedJobQueue);
                                    EV<<"working on ENDED JOBS map for: "<<jobId<<endl;
                                    completedJobIdLength=completedJobQueue.size();
-                                   emit(CompletedSignal,completedJobIdLength);
                                    EV<<"   "<<completedJobIdLength<<endl;
            }
 
