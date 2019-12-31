@@ -15,7 +15,7 @@ private:
     std::map<std::string, msg_check *> completedJobQueue;
     double totale;
     void searchMessage(std::string jobId,  msg_check *msg, std::map<std::string, msg_check *> *storedMap);
-    void executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap);
+    void executorReboot(std::string jobId,std::map<std::string, msg_check *> *storedMap);
     simtime_t channelDelay;
 
 
@@ -95,10 +95,10 @@ void Storage::handleMessage(cMessage *cmsg) {
 
    if(msg->getReBoot()==true){
        EV<<"the failure of executor "<<msg->getOriginalExecId()<<" is detected by the storage"<<endl;
-       executorReboot(jobId,msg,&jobQueue);
-       executorReboot(jobId,msg,&newJobsQueue);
-       executorReboot(jobId,msg,&reRoutedQueue);
-       executorReboot(jobId,msg,&completedJobQueue);
+       executorReboot(jobId,&jobQueue);
+       executorReboot(jobId,&newJobsQueue);
+       executorReboot(jobId,&reRoutedQueue);
+       executorReboot(jobId,&completedJobQueue);
 
        msgBackup = new msg_check("End recover backup");
        msgBackup->setBackupComplete(true);
@@ -112,33 +112,33 @@ void Storage::handleMessage(cMessage *cmsg) {
            EV<<"working on NEWJOB map for: "<<jobId<<endl;
            newJobIdLength=newJobsQueue.size();
            emit(NewSignal,newJobIdLength);
-           EV<<"   "<<newJobIdLength<<endl;
+          // EV<<"   "<<newJobIdLength<<endl;
          }else if(msg->getJobQueue()==true){
                    msg->setJobQueue(true);
                    searchMessage(jobId,msg,&jobQueue);
                    EV<<"working on JOBID map for: "<<jobId<<endl;
                    jobIdLength=jobQueue.size();
                    emit(JobSignal,jobIdLength);
-                   EV<<"   "<<jobIdLength<<endl;
+                 //  EV<<"   "<<jobIdLength<<endl;
                 }else if(msg->getReRoutedJobQueue()==true){
                            msg->setReRoutedJobQueue(true);
                            searchMessage(jobId,msg,&reRoutedQueue);
                            EV<<"working on REROUTED map for: "<<jobId<<endl;
                            reRoutedJobIdLength=reRoutedQueue.size();
                            emit(ReRoutedSignal,reRoutedJobIdLength);
-                           EV<<"   "<<reRoutedJobIdLength<<endl;
+                          // EV<<"   "<<reRoutedJobIdLength<<endl;
                        }else if(msg->getCompletedQueue()==true){
                                    msg->setCompletedQueue(true);
                                    searchMessage(jobId,msg,&completedJobQueue);
                                    EV<<"working on ENDED JOBS map for: "<<jobId<<endl;
                                    completedJobIdLength=completedJobQueue.size();
-                                   EV<<"   "<<completedJobIdLength<<endl;
+                                   //EV<<"   "<<completedJobIdLength<<endl;
            }
 
    delete msg;
 }
 
-void Storage::executorReboot(std::string jobId, msg_check *msg,std::map<std::string, msg_check *> *storedMap){
+void Storage::executorReboot(std::string jobId,std::map<std::string, msg_check *> *storedMap){
 
     msg_check *msgBackup;
     std::map<std::string, msg_check *>::iterator search;
