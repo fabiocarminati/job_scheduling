@@ -164,7 +164,6 @@ void Client::selfMessage(msg_check *msg){
         //select the executor among a set of uniform values
 
         executor=rand() % E;
-        executor=0;
 
 
         message = new msg_check(msgname);
@@ -198,7 +197,7 @@ void Client::selfMessage(msg_check *msg){
                 maxRetry--;
             else{
                maxRetry=par("maxRetry");
-               executor=0;
+
                executor=rand() % E;
                while(executor==msg_to_ack->getOriginalExecId())
                    executor=rand() % E;
