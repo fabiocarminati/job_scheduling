@@ -250,6 +250,7 @@ void Executor::rePopulateQueues(msg_check *msg){
         bubble("Normal mode");
         failure=false;//until I have recovered all the backup message I will still ignore all the other messages
         restartNormalMode();
+        delete msg;
     }
 }
 
@@ -398,9 +399,10 @@ void Executor::reRoutedHandler(msg_check *msg){
         if(failure){
             EV<<"crash in the middle of notify the packet received due to load balancing;TIMEOUT WILL EXPIRE:RESTART LOAD BALANCING "<<endl;
             //the packet can be executed twice if is not resend after the new load balancing to this entity
+            delete msg;
             return;
         }
-        msgSend = msg->dup();
+        msgSend = msg;
         msgSend->setAck(true);
 
 
@@ -566,7 +568,7 @@ void Executor::newJob(msg_check *msg){
         jobQueue.insert(msg->dup());
 
         timeoutJobComplexity = msg->getJobComplexity();
-        msgSend=msg->dup();
+        msgSend=msg;
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
 
@@ -658,16 +660,14 @@ void Executor::timeoutLoadBalancingHandler(){
 
 void Executor::timeoutJobExecutionHandler(){
 
-    std::string jobId;
+    const char *jobId;
     int portId;
     simtime_t timeoutJobComplexity;
     msg_check *msgServiced,*msgSend;
     // Get the source_id of the message that just finished service
 
     msgServiced = check_and_cast<msg_check *>(jobQueue.pop());
-    jobId.append(std::to_string(msgServiced->getOriginalExecId()));
-    jobId.append("-");
-    jobId.append(std::to_string(msgServiced->getRelativeJobId()));
+    jobId = msgServiced->getName();
     portId = msgServiced->getClientId()-1;  //Source id-1=portId
     EV<<"Completed job: "<<jobId<<" creating by the user ID "<<portId<<endl;
     jobCompleted++;
@@ -680,7 +680,7 @@ void Executor::timeoutJobExecutionHandler(){
     completedJob.add(msgSend);
 
 
-    msgSend= msgServiced->dup();
+    msgSend= msgServiced;
     msgSend->setCompletedQueue(true);
     send(msgSend,"backup_send$o");
 
@@ -694,9 +694,7 @@ void Executor::timeoutJobExecutionHandler(){
       EV<<"Empty queue, the machine "<<myId<<" goes IDLE"<<endl;
     else{
          msgServiced = check_and_cast<msg_check *>(jobQueue.front());
-         jobId.append(std::to_string(msgServiced->getOriginalExecId()));
-         jobId.append("-");
-         jobId.append(std::to_string(msgServiced->getRelativeJobId()));
+         jobId = msgServiced->getName();
          portId = msgServiced->getClientId()-1;
          timeoutJobComplexity = msgServiced->getJobComplexity();
          scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
