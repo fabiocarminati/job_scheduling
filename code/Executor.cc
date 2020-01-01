@@ -127,15 +127,7 @@ void Executor::handleMessage(cMessage *cmsg) {
            else{
                EV<<"The executor is reboot mode and this is not a msg coming from the backup:ignore it"<<endl;
                if(!msg->isSelfMessage())
-               {
-                   EV<<"during reboot no one should be scheduled:timeoutReRouted "<<timeoutReRouted->isScheduled()<<endl;
-                   EV<<"timeoutJobComputation "<<timeoutJobComputation->isScheduled()<<endl;
-                   EV<<"timeoutLoadBalancing "<<timeoutLoadBalancing->isScheduled()<<endl;
-                   EV<<"timeoutFailureEnd "<<timeoutFailureEnd->isScheduled()<<endl;
-
                    delete msg;
-
-               }
            }
    }
    else{
