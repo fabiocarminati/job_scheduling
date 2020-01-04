@@ -19,7 +19,7 @@ private:
     simtime_t timeoutFailure;
     simtime_t timeoutEndActual;
 
-    int E,C,nArrived,myId;
+    int E,C,nArrived,myId,granularity,skipLoad;
     double probEvent,probCrashDuringExecution,jobCompleted;
     bool probingMode,failure;
 
@@ -74,6 +74,8 @@ void Executor::initialize() {
     probingMode = false;
     C = par("C");
     E = par("E"); //non volatile parameters --once defined they never change
+    granularity = par("granularity");
+    skipLoad=granularity;
     channelDelay = par("channelDelay");
     timeoutLoad = par("timeoutLoad")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
     timeoutFailure = par("timeoutFailure")+2*channelDelay;
@@ -309,6 +311,7 @@ void Executor::balancedJob(msg_check *msg){
 
 void Executor::probeHandler(msg_check *msg){
     msg_check *tmp;
+    int greaterLength;
     if(msg->getAck()==false)  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
         //NO IS WRONG THIS THINKING+1 is needed in order to avoid ping pong:exe machine 5 has queue length =3 while machine 1 has length  =2... without +1 5-2 and 1-3 but if a
         //an arrival comes in 3
@@ -323,19 +326,41 @@ void Executor::probeHandler(msg_check *msg){
         }else
             msg->setDuplicate(false);
 
-        EV<<"The original executor "<<msg->getOriginalExecId()<<" has queue length equal to "<<msg->getQueueLength()<<" this one "<<jobQueue.getLength()<<endl;
+        EV<<"The original executor "<<msg->getOriginalExecId()<<" has queue length equal to "<<msg->getQueueLength()<<" while this one: "<<jobQueue.getLength()<<endl;
 
         failureEvent(probCrashDuringExecution);
         if(failure){
             EV<<"crash in the middle of sending probing response "<<endl;
             return;
         }
-        if(msg->getDuplicate() || jobQueue.getLength() < msg->getQueueLength()){
-           msg->setQueueLength(jobQueue.getLength());
-           send(msg,"load_send",msg->getOriginalExecId());
-        }else
 
-            delete msg;
+
+        switch(granularity)
+        {
+        case 1:
+            EV<<"case 1 ";
+            if(msg->getDuplicate() || jobQueue.getLength() < msg->getQueueLength()){
+               msg->setQueueLength(jobQueue.getLength());
+               send(msg,"load_send",msg->getOriginalExecId());
+               EV<<"normal reply to probe"<<endl;
+            }
+            else
+                delete msg;
+            break;
+
+        default:
+            greaterLength=jobQueue.getLength()+granularity;
+            if(msg->getDuplicate() ||  greaterLength<msg->getQueueLength()){
+                   msg->setQueueLength(jobQueue.getLength());
+                   send(msg,"load_send",msg->getOriginalExecId());
+                   EV<<"suboptimal load balancing reply to probe"<<endl;
+             }
+            else
+                 delete msg;
+
+
+
+        }
 
     }
     else{
@@ -556,6 +581,7 @@ void Executor::newJob(msg_check *msg){
     send(msgSend,"exec$o",port_id);
     EV<<"First time the packet is in the cluster:define his "<<id<<endl;
     msg->setNewJob(false);
+
     if(jobQueue.isEmpty()){
         jobQueue.insert(msg->dup());
 
@@ -568,15 +594,41 @@ void Executor::newJob(msg_check *msg){
             EV<<"New message arrived with idle server:execute it immediately:Job Id "<<id<<endl;
             scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
         }
-    }
-    else{
-        msgSend=msg->dup();
-        msgSend->setNewJobsQueue(true);
-        send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
+    }else
+        switch(granularity){
+        case 1:
+                msgSend=msg->dup();
+                msgSend->setNewJobsQueue(true);
+                send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
 
-        newJobsQueue.insert(msg);
-        balancedJob(msg);
-    }
+                newJobsQueue.insert(msg->dup());
+                balancedJob(msg);
+                EV<<"Do optimal load balancing"<<endl;
+                break;
+
+        default:
+                if(!skipLoad){
+                    msgSend=msg->dup();
+                    msgSend->setNewJobsQueue(true);
+                    send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
+                    EV<<"Perform load this time; partial "<<skipLoad<<" versus granularity "<<granularity<<endl;
+                    newJobsQueue.insert(msg->dup());
+                    skipLoad=granularity;
+                    balancedJob(msg);
+                }
+                else{
+                    skipLoad--;
+
+                    jobQueue.insert(msg->dup());
+                    EV<<"partial "<<skipLoad<<" versus granularity "<<granularity<<endl;
+                    msgSend=msg;
+                    msgSend->setJobQueue(true);
+                    send(msgSend,"backup_send$o");
+
+                }
+        }
+
+
 }
 
 void Executor::timeoutLoadBalancingHandler(){

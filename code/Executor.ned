@@ -5,6 +5,7 @@ simple Executor
 		@display("i=block/queue");
 		int C;
         int E;
+        int granularity;
         double probEvent;
         double probCrashDuringExecution;
 		double channelDelay @unit(s);
