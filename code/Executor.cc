@@ -312,92 +312,91 @@ void Executor::balancedJob(msg_check *msg){
 void Executor::probeHandler(msg_check *msg){
     msg_check *tmp;
     int greaterLength;
-    if(msg->getAck()==false)  {//sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
-        //NO IS WRONG THIS THINKING+1 is needed in order to avoid ping pong:exe machine 5 has queue length =3 while machine 1 has length  =2... without +1 5-2 and 1-3 but if a
-        //an arrival comes in 3
-        msg->setAck(true);
-        msg->setStatusRequest(false);  //set message priority
-        msg->setProbing(true);
-        msg->setReRouted(false);
+    switch(msg->getAck()){
+        case false:  //sono stato interrogato per sapere lo stato della mia coda---setAck=true---salvo da quaclhe parte il minimo poi decido se reinstradare poi i da E diventa 0 cosi posso rifare questo giochino
 
-        if(checkDuplicate(msg)){
-            msg->setDuplicate(true);
-            EV<<"During load balancing I found a duplicate"<<endl;
-        }else
-            msg->setDuplicate(false);
+            msg->setAck(true);
+            msg->setStatusRequest(false);
+            msg->setProbing(true);
+            msg->setReRouted(false);
 
-        EV<<"The original executor "<<msg->getOriginalExecId()<<" has queue length equal to "<<msg->getQueueLength()<<" while this one: "<<jobQueue.getLength()<<endl;
+            if(checkDuplicate(msg)){
+                msg->setDuplicate(true);
+                EV<<"During load balancing I found a duplicate"<<endl;
+            }else
+                msg->setDuplicate(false);
 
-        failureEvent(probCrashDuringExecution);
-        if(failure){
-            EV<<"crash in the middle of sending probing response "<<endl;
-            return;
-        }
+            EV<<"The original executor "<<msg->getOriginalExecId()<<" has queue length equal to "<<msg->getQueueLength()<<" while this one: "<<jobQueue.getLength()<<endl;
 
-
-        switch(granularity)
-        {
-        case 1:
-            EV<<"case 1 ";
-            if(msg->getDuplicate() || jobQueue.getLength() < msg->getQueueLength()){
-               msg->setQueueLength(jobQueue.getLength());
-               send(msg,"load_send",msg->getOriginalExecId());
-               EV<<"normal reply to probe"<<endl;
+            failureEvent(probCrashDuringExecution);
+            if(failure){
+                EV<<"crash in the middle of sending probing response "<<endl;
+                return;
             }
-            else
-                delete msg;
-            break;
 
-        default:
-            greaterLength=jobQueue.getLength()+granularity;
-            if(msg->getDuplicate() ||  greaterLength<msg->getQueueLength()){
+
+            switch(granularity)
+            {
+            case 1:
+                if(msg->getDuplicate() || jobQueue.getLength() < msg->getQueueLength()){
                    msg->setQueueLength(jobQueue.getLength());
                    send(msg,"load_send",msg->getOriginalExecId());
-                   EV<<"suboptimal load balancing reply to probe"<<endl;
-             }
-            else
-                 delete msg;
+                   EV<<"normal reply to probe"<<endl;
+                }
+                else
+                    delete msg;
+                break;
+
+            default:
+                greaterLength=jobQueue.getLength()+granularity;
+                if(msg->getDuplicate() ||  greaterLength<msg->getQueueLength()){
+                       msg->setQueueLength(jobQueue.getLength());
+                       send(msg,"load_send",msg->getOriginalExecId());
+                       EV<<"suboptimal load balancing reply to probe"<<endl;
+                 }
+                else
+                     delete msg;
 
 
 
-        }
+            }
+            break;
+            case true:
+            /*
+             D)The Original exec has received the reply from another executor:
+                 ->It will extract the QueueLength field of the packet and store it
+             * */
+                if(!newJobsQueue.isEmpty()&&strcmp(check_and_cast<msg_check *>(newJobsQueue.front())->getName(),msg->getName())==0){
+                   msg->setProbing(false);
+                   msg->setAck(false);
 
-    }
-    else{
-        /*
-         D)The Original exec has received the reply from another executor:
-             ->It will extract the QueueLength field of the packet and store it
+                   if(msg->getDuplicate()){
+                       cancelEvent(timeoutLoadBalancing);
+                       tmp = check_and_cast<msg_check *>(newJobsQueue.pop()); //remove
+                       tmp->setNewJobsQueue(true);
+                       send(tmp,"backup_send$o");
 
-         * */
-        if(!newJobsQueue.isEmpty()&&strcmp(check_and_cast<msg_check *>(newJobsQueue.front())->getName(),msg->getName())==0){
-           msg->setProbing(false);
-           msg->setAck(false);
+                       reRoutedJobs.add(msg->dup());
+                       msg->setDuplicate(false);
+                       msg->setReRoutedJobQueue(true);
+                       send(msg,"backup_send$o");
 
-           if(msg->getDuplicate()){
-               cancelEvent(timeoutLoadBalancing);
-               tmp = check_and_cast<msg_check *>(newJobsQueue.pop()); //remove
-               tmp->setNewJobsQueue(true);
-               send(tmp,"backup_send$o");
+                       probingMode = false;
+                       balanceResponses.clear();
 
-               reRoutedJobs.add(msg->dup());
-               msg->setDuplicate(false);
-               msg->setReRoutedJobQueue(true);
-               send(msg,"backup_send$o");
-
-               probingMode = false;
-               balanceResponses.clear();
-
-               if(newJobsQueue.getLength()>0){
-                   tmp = check_and_cast<msg_check *>(newJobsQueue.front());
-                   balancedJob(tmp);
+                       if(newJobsQueue.getLength()>0){
+                           tmp = check_and_cast<msg_check *>(newJobsQueue.front());
+                           balancedJob(tmp);
+                       }
+                   }
+                   else{
+                       EV<<"store load reply from "<< msg->getActualExecId()<<endl;
+                       balanceResponses.insert(msg);
+                   }
                }
-           }
-           else{
-               EV<<"store load reply from "<< msg->getActualExecId()<<endl;
-               balanceResponses.insert(msg);
-           }
-       } else
-           delete msg;
+               else
+                  delete msg;
+               break;
     }
 }
 
@@ -405,7 +404,8 @@ void Executor::reRoutedHandler(msg_check *msg){
     msg_check *msgSend,*tmp;
     int actualExecId;
     simtime_t timeoutJobComplexity;
-    if(msg->getAck()==false)  {//the actual exec has received the packet;notifies the original exec
+    switch(msg->getAck()){
+    case false: //the actual exec has received the packet;notifies the original exec
         jobQueue.insert(msg->dup());//not in new job otherwise will redo load balancing:wrong
 
         msgSend=msg->dup();
@@ -432,8 +432,8 @@ void Executor::reRoutedHandler(msg_check *msg){
         }
 
         EV<<"new job in the queue, actual length: "<< jobQueue.getLength()<<endl;
-   }
-    else{
+        break;
+    case true:
         cancelEvent(timeoutReRouted);
         tmp = check_and_cast<msg_check *>(newJobsQueue.pop());
         msgSend=tmp->dup();
@@ -454,6 +454,7 @@ void Executor::reRoutedHandler(msg_check *msg){
         }
         EV<<"ack received from actual exec "<< actualExecId <<endl;
         delete msg;
+        break;
     }
 }
 
