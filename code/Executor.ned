@@ -6,6 +6,7 @@ simple Executor
 		int C;
         int E;
         int granularity;
+        int probeResponse;
         double probEvent;
         double probCrashDuringExecution;
 		double channelDelay @unit(s);

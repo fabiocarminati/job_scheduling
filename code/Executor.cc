@@ -19,7 +19,7 @@ private:
     simtime_t timeoutFailure;
     simtime_t timeoutEndActual;
 
-    int E,C,nArrived,myId,granularity,skipLoad;
+    int E,C,nArrived,myId,granularity,skipLoad,probeResponse;
     double probEvent,probCrashDuringExecution,jobCompleted;
     bool probingMode,failure;
 
@@ -75,6 +75,7 @@ void Executor::initialize() {
     C = par("C");
     E = par("E"); //non volatile parameters --once defined they never change
     granularity = par("granularity");
+    probeResponse = par("probeResponse");
     skipLoad=granularity;
     channelDelay = par("channelDelay");
     timeoutLoad = par("timeoutLoad")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
@@ -335,7 +336,7 @@ void Executor::probeHandler(msg_check *msg){
             }
 
 
-            switch(granularity)
+            switch(probeResponse)
             {
             case 1:
                 if(msg->getDuplicate() || jobQueue.getLength() < msg->getQueueLength()){
@@ -348,7 +349,7 @@ void Executor::probeHandler(msg_check *msg){
                 break;
 
             default:
-                greaterLength=jobQueue.getLength()+granularity;
+                greaterLength=jobQueue.getLength()+probeResponse;
                 if(msg->getDuplicate() ||  greaterLength<msg->getQueueLength()){
                        msg->setQueueLength(jobQueue.getLength());
                        send(msg,"load_send",msg->getOriginalExecId());
