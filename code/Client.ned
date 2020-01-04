@@ -8,7 +8,6 @@ simple Client
         double timeoutAck @unit(s);
         double timeoutStatus @unit(s);
         @display("i=block/source");
-        int N;
         int E;
         int maxRetry;
         @signal[avgSendingRate](type="simtime_t");

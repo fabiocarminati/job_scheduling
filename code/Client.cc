@@ -9,7 +9,7 @@ class Client : public cSimpleModule {
 private:
   int sourceID;
   int nbGenMessages;
-  int N,E;
+  int E;
   int maxRetry;
   msg_check *sendNewJob;
   msg_check *timeoutAckNewJob;
@@ -58,7 +58,6 @@ void Client::initialize() {
     timeoutStatus=par("timeoutStatus")+2*channelDelay;
     EV<<"ack "<<timeoutAck<<" status "<<timeoutStatus<<endl;
     E = par("E"); //non volatile parameters --once defined they never change
-    N = par("N");
     interArrivalTime=exponential(par("interArrivalTime").doubleValue()); //simulate an exponential generation of packets
     maxRetry=par("maxRetry");
 

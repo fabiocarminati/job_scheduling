@@ -3,7 +3,7 @@ simple Executor
     parameters:
 
 		@display("i=block/queue");
-		int N;
+		int C;
         int E;
         double probEvent;
         double probCrashDuringExecution;

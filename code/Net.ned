@@ -1,7 +1,7 @@
 network Net
 {
     parameters:
-        int N;
+        int C;
         int E;
         double channelDelay @unit(s);
       
@@ -9,7 +9,7 @@ network Net
         @figure[description](type=text; pos=5,20; font=,,bold; text="Distributed job scheduling");
 
     submodules:
-        client[N]: Client {
+        client[C]: Client {
             parameters:
                 @display("p=100,200,c;");
             gates:
@@ -21,7 +21,7 @@ network Net
             parameters:
                 @display("p=327,191,ri"); //display elements in circle(see section 24 of the manual for the details
             gates:
-                exec[N];
+                exec[C];
                 backup_send;
                 load_receive[E];
                 load_send[E];
@@ -35,7 +35,7 @@ network Net
 
         }
     connections:
-        for i=0..N-1, for j=0..E-1 {
+        for i=0..C-1, for j=0..E-1 {
             // client[i].out --> queue.in++;
             client[i].user[j] <--> {delay = channelDelay;} <--> executor[j].exec[i];
 

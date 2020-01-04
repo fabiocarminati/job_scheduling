@@ -2,8 +2,7 @@ simple Storage
 {    
     parameters:
 		@display("i=block/sink");
-		
-        int E;
+
 		double channelDelay @unit(s);
 		
         // Average map length

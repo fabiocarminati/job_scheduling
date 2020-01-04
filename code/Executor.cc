@@ -19,7 +19,7 @@ private:
     simtime_t timeoutFailure;
     simtime_t timeoutEndActual;
 
-    int E,N,nArrived,myId;
+    int E,C,nArrived,myId;
     double probEvent,probCrashDuringExecution,jobCompleted;
     bool probingMode,failure;
 
@@ -72,14 +72,14 @@ Executor::~Executor()
 
 void Executor::initialize() {
     probingMode = false;
-    N = par("N");
+    C = par("C");
     E = par("E"); //non volatile parameters --once defined they never change
     channelDelay = par("channelDelay");
     timeoutLoad = par("timeoutLoad")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
     timeoutFailure = par("timeoutFailure")+2*channelDelay;
     timeoutEndActual = par("timeoutEndActual")+2*channelDelay;
     EV<<"load "<<timeoutLoad<<" failure "<<timeoutFailure<<" end "<<timeoutEndActual<<endl;
-    myId=getId()-2-N;
+    myId=getId()-2-C;
     nArrived=0;
     jobCompleted=0;
     probEvent=par("probEvent");
