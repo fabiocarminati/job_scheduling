@@ -200,6 +200,8 @@ msg_check::msg_check(const char *name, short kind) : ::omnetpp::cPacket(name,kin
     this->BackupComplete = false;
     this->CompletedQueue = false;
     this->Duplicate = false;
+    this->StartingTime = 0;
+    this->EndingTime = 0;
 }
 
 msg_check::msg_check(const msg_check& other) : ::omnetpp::cPacket(other)
@@ -240,6 +242,8 @@ void msg_check::copy(const msg_check& other)
     this->BackupComplete = other.BackupComplete;
     this->CompletedQueue = other.CompletedQueue;
     this->Duplicate = other.Duplicate;
+    this->StartingTime = other.StartingTime;
+    this->EndingTime = other.EndingTime;
 }
 
 void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
@@ -264,6 +268,8 @@ void msg_check::parsimPack(omnetpp::cCommBuffer *b) const
     doParsimPacking(b,this->BackupComplete);
     doParsimPacking(b,this->CompletedQueue);
     doParsimPacking(b,this->Duplicate);
+    doParsimPacking(b,this->StartingTime);
+    doParsimPacking(b,this->EndingTime);
 }
 
 void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
@@ -288,6 +294,8 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->BackupComplete);
     doParsimUnpacking(b,this->CompletedQueue);
     doParsimUnpacking(b,this->Duplicate);
+    doParsimUnpacking(b,this->StartingTime);
+    doParsimUnpacking(b,this->EndingTime);
 }
 
 int msg_check::getRelativeJobId() const
@@ -480,6 +488,26 @@ void msg_check::setDuplicate(bool Duplicate)
     this->Duplicate = Duplicate;
 }
 
+::omnetpp::simtime_t msg_check::getStartingTime() const
+{
+    return this->StartingTime;
+}
+
+void msg_check::setStartingTime(::omnetpp::simtime_t StartingTime)
+{
+    this->StartingTime = StartingTime;
+}
+
+::omnetpp::simtime_t msg_check::getEndingTime() const
+{
+    return this->EndingTime;
+}
+
+void msg_check::setEndingTime(::omnetpp::simtime_t EndingTime)
+{
+    this->EndingTime = EndingTime;
+}
+
 class msg_checkDescriptor : public omnetpp::cClassDescriptor
 {
   private:
@@ -545,7 +573,7 @@ const char *msg_checkDescriptor::getProperty(const char *propertyname) const
 int msg_checkDescriptor::getFieldCount() const
 {
     omnetpp::cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 19+basedesc->getFieldCount() : 19;
+    return basedesc ? 21+basedesc->getFieldCount() : 21;
 }
 
 unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
@@ -576,8 +604,10 @@ unsigned int msg_checkDescriptor::getFieldTypeFlags(int field) const
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISEDITABLE,
+        FD_ISEDITABLE,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<19) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<21) ? fieldTypeFlags[field] : 0;
 }
 
 const char *msg_checkDescriptor::getFieldName(int field) const
@@ -608,8 +638,10 @@ const char *msg_checkDescriptor::getFieldName(int field) const
         "BackupComplete",
         "CompletedQueue",
         "Duplicate",
+        "StartingTime",
+        "EndingTime",
     };
-    return (field>=0 && field<19) ? fieldNames[field] : nullptr;
+    return (field>=0 && field<21) ? fieldNames[field] : nullptr;
 }
 
 int msg_checkDescriptor::findField(const char *fieldName) const
@@ -635,6 +667,8 @@ int msg_checkDescriptor::findField(const char *fieldName) const
     if (fieldName[0]=='B' && strcmp(fieldName, "BackupComplete")==0) return base+16;
     if (fieldName[0]=='C' && strcmp(fieldName, "CompletedQueue")==0) return base+17;
     if (fieldName[0]=='D' && strcmp(fieldName, "Duplicate")==0) return base+18;
+    if (fieldName[0]=='S' && strcmp(fieldName, "StartingTime")==0) return base+19;
+    if (fieldName[0]=='E' && strcmp(fieldName, "EndingTime")==0) return base+20;
     return basedesc ? basedesc->findField(fieldName) : -1;
 }
 
@@ -666,8 +700,10 @@ const char *msg_checkDescriptor::getFieldTypeString(int field) const
         "bool",
         "bool",
         "bool",
+        "simtime_t",
+        "simtime_t",
     };
-    return (field>=0 && field<19) ? fieldTypeStrings[field] : nullptr;
+    return (field>=0 && field<21) ? fieldTypeStrings[field] : nullptr;
 }
 
 const char **msg_checkDescriptor::getFieldPropertyNames(int field) const
@@ -753,6 +789,8 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
         case 16: return bool2string(pp->getBackupComplete());
         case 17: return bool2string(pp->getCompletedQueue());
         case 18: return bool2string(pp->getDuplicate());
+        case 19: return simtime2string(pp->getStartingTime());
+        case 20: return simtime2string(pp->getEndingTime());
         default: return "";
     }
 }
@@ -786,6 +824,8 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
         case 16: pp->setBackupComplete(string2bool(value)); return true;
         case 17: pp->setCompletedQueue(string2bool(value)); return true;
         case 18: pp->setDuplicate(string2bool(value)); return true;
+        case 19: pp->setStartingTime(string2simtime(value)); return true;
+        case 20: pp->setEndingTime(string2simtime(value)); return true;
         default: return false;
     }
 }

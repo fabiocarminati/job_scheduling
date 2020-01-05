@@ -19,4 +19,6 @@ packet msg_check //name of the new type of message
     bool BackupComplete;
     bool CompletedQueue;
     bool Duplicate;
+    simtime_t StartingTime;
+    simtime_t EndingTime;
 };

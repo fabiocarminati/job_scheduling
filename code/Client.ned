@@ -13,6 +13,9 @@ simple Client
         @signal[avgSendingRate](type="simtime_t");
         @statistic[avgSendingRate](title="INTERARRIVAL RATE";record=vector, timeavg;interpolationmode=sample-hold);
       	
+      	@signal[realTime](type="simtime_t");
+        @statistic[realTime](title="REAL COMPUTATION TIME";record=vector, timeavg;interpolationmode=sample-hold);
+      	
   	    @signal[avgComplexity](type="simtime_t");
         @statistic[avgComplexity](title="JOB COMPLEXITY";record=vector, timeavg;interpolationmode=sample-hold);
       	

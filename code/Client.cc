@@ -21,6 +21,7 @@ private:
 
   bool startCheckJobStatus;
   cArray workInProgress;
+  cArray notResponding;
   void jobStatusHandler();
   void selfMessage(msg_check *msg);
 
@@ -29,7 +30,7 @@ protected:
   virtual void handleMessage(cMessage *cmsg);
   simsignal_t avgSendingRateSignal;
   simsignal_t avgComplexitySignal;
-
+  simsignal_t realTimeSignal;
 
 public:
   Client();
@@ -63,9 +64,9 @@ void Client::initialize() {
 
     avgSendingRateSignal = registerSignal("avgSendingRate");
     avgComplexitySignal = registerSignal("avgComplexity");
+    realTimeSignal = registerSignal("realTime");
 
     emit(avgSendingRateSignal,interArrivalTime);
-
 
 
     sendNewJob = new msg_check("sendNewJob");
@@ -84,7 +85,7 @@ void Client::initialize() {
 
 void Client::handleMessage(cMessage *cmsg) {
     int executor;
-    simtime_t interArrivalTime;
+    simtime_t interArrivalTime,realComputationTime;
     // Casting from cMessage to msg_check
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
     const char  *jobId;
@@ -99,6 +100,9 @@ void Client::handleMessage(cMessage *cmsg) {
                         executor = msg->getOriginalExecId();
                         send(msg->dup(),"user$o",executor);
                         //delete the job from the list of the job currently in processing
+                        realComputationTime=msg->getEndingTime()-msg->getStartingTime();
+                        EV<<"real computation time measured "<<realComputationTime<<endl;
+                        emit(realTimeSignal,realComputationTime);
                         delete workInProgress.remove(jobId);
                     }
                     else{
@@ -182,6 +186,8 @@ void Client::selfMessage(msg_check *msg){
         message->setAck(false);
         message->setNewJob(true);
         message->setReBoot(false);
+        message->setStartingTime(simTime());
+        message->setEndingTime(SIMTIME_ZERO);
         EV<<"msg sent to machine "<<executor<<endl;
         msg_to_ack=message->dup();
         send(message,"user$o",executor);  //send the message to the queue

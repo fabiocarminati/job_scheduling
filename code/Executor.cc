@@ -750,11 +750,12 @@ void Executor::timeoutJobExecutionHandler(){
     EV<<"Completed job: "<<jobId<<" creating by the user ID "<<portId<<endl;
     jobCompleted++;
 
-    msgSend= msgServiced->dup();
+    msgSend = msgServiced->dup();
     msgSend->setJobQueue(true);
     send(msgSend,"backup_send$o");
 
-    msgSend= msgServiced->dup();
+    msgSend = msgServiced->dup();
+    msgSend->setEndingTime(simTime());
     completedJob.add(msgSend);
 
 

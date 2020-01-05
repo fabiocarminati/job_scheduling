@@ -42,6 +42,8 @@
  *     bool BackupComplete;
  *     bool CompletedQueue;
  *     bool Duplicate;
+ *     simtime_t StartingTime;
+ *     simtime_t EndingTime;
  * }
  * </pre>
  */
@@ -67,6 +69,8 @@ class msg_check : public ::omnetpp::cPacket
     bool BackupComplete;
     bool CompletedQueue;
     bool Duplicate;
+    ::omnetpp::simtime_t StartingTime;
+    ::omnetpp::simtime_t EndingTime;
 
   private:
     void copy(const msg_check& other);
@@ -123,6 +127,10 @@ class msg_check : public ::omnetpp::cPacket
     virtual void setCompletedQueue(bool CompletedQueue);
     virtual bool getDuplicate() const;
     virtual void setDuplicate(bool Duplicate);
+    virtual ::omnetpp::simtime_t getStartingTime() const;
+    virtual void setStartingTime(::omnetpp::simtime_t StartingTime);
+    virtual ::omnetpp::simtime_t getEndingTime() const;
+    virtual void setEndingTime(::omnetpp::simtime_t EndingTime);
 };
 
 inline void doParsimPacking(omnetpp::cCommBuffer *b, const msg_check& obj) {obj.parsimPack(b);}
