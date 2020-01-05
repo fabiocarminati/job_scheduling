@@ -20,8 +20,8 @@ private:
   simtime_t channelDelay;
 
   bool startCheckJobStatus;
-  cArray workInProgress;
-  cArray notResponding;
+  cArray notComputed;
+  cArray noStatusInfo;
   void jobStatusHandler();
   void selfMessage(msg_check *msg);
 
@@ -85,6 +85,8 @@ void Client::initialize() {
 
 void Client::handleMessage(cMessage *cmsg) {
     int executor;
+    cObject *obj;
+    msg_check *msgStore,*message;
     simtime_t interArrivalTime,realComputationTime;
     // Casting from cMessage to msg_check
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
@@ -103,20 +105,38 @@ void Client::handleMessage(cMessage *cmsg) {
                         realComputationTime=msg->getEndingTime()-msg->getStartingTime();
                         EV<<"real computation time measured "<<realComputationTime<<endl;
                         emit(realTimeSignal,realComputationTime);
-                        delete workInProgress.remove(jobId);
+                        if(noStatusInfo.exist(jobId))
+                            delete noStatusInfo.remove(jobId);
+                        else
+                            if(notComputed.exist(jobId)){
+                                delete notComputed.remove(jobId);
+                            }
                     }
                     else{
-                        EV<<"Not completed: "<<jobId<<endl;
+                        EV<<"Not completed: "<<jobId<<" will be reasked later"<<endl;
+
+                                obj = noStatusInfo.remove(jobId);
+                                if (obj!=nullptr){
+                                   message = check_and_cast<msg_check *>(obj);
+                                   EV << "Job not completely processed yet:we will reask his status later "<<message->getRelativeJobId()<<endl;
+                                   msgStore = message->dup();
+                                   notComputed.add(msgStore);
+
+                                }
+                                else
+                                   EV << "FATAL ERROR: Erasing in executor from the completed job queue: "<<jobId<<endl;
+
+                        }
                     }
-                }
-                delete msg;
+
+
             }
             else //received the ack from the executor, the job was received correctly
                 if(msg->getNewJob()){
                      if(msg->getAck()==true){
                         msg->setNewJob(false);
                         msg->setAck(false);
-                        workInProgress.add(msg);
+                        notComputed.add(msg);
                         EV << "ACK received for "<<jobId<<endl;
                         cancelEvent(timeoutAckNewJob);
                         delete msg_to_ack;
@@ -129,27 +149,38 @@ void Client::handleMessage(cMessage *cmsg) {
                     }
                 }
 
-
 }
+
+
 
 void Client::jobStatusHandler(){
     int i;
-    msg_check *message;
+    msg_check *message,*msgStore;
     cObject *obj;
     int executor;
-    for (i = 0;i < workInProgress.size();i++){
-         obj = workInProgress.get(i);
-         if(obj!=nullptr){
-            message = check_and_cast<msg_check *>(obj);
-            message = message->dup();
-            message->setStatusRequest(true);
-            executor = message->getOriginalExecId();
-            EV<<"Asking the status of: "<<message->getOriginalExecId()<<"-"<<message->getRelativeJobId()<<endl;
-            send(message,"user$o",executor);
+
+    for (i = 0;i < notComputed.size();i++){
+
+        obj = notComputed.remove(i);
+        if (obj!=nullptr){
+           message = check_and_cast<msg_check *>(obj);
+           EV << "Remove from notCompleted cArray "<<message->getRelativeJobId()<<endl;
+           msgStore = message->dup();
+           noStatusInfo.add(msgStore);
+
         }
+        else
+           EV << "FATAL ERROR: Erasing in executor from the completed job queue: "<<endl;
+
+        message->setStatusRequest(true);
+        executor = message->getOriginalExecId();
+        EV<<"Asking the status of: "<<message->getOriginalExecId()<<"-"<<message->getRelativeJobId()<<endl;
+        send(message,"user$o",executor);
+
     }
     scheduleAt(simTime() + timeoutStatus, checkJobStatus);
 }
+
 
 void Client::selfMessage(msg_check *msg){
     int executor;
