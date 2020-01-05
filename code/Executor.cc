@@ -128,7 +128,7 @@ void Executor::handleMessage(cMessage *cmsg) {
                 rePopulateQueues(msg);
              }
            else{
-               EV<<"The executor is reboot mode and this is not a msg coming from the backup:ignore it"<<endl;
+               EV<<"The executor isn't in normal mode and this is not a msg coming from the backup:ignore it"<<endl;
                if(!msg->isSelfMessage())
                    delete msg;
            }
@@ -208,6 +208,7 @@ void Executor::failureEvent(double prob){
 
 void Executor::rePopulateQueues(msg_check *msg){
     msg_check *msgSend;
+    int portId;
     if(msg->getBackupComplete()==false){
         msg->setReBoot(false);
         if(msg->getNewJobsQueue()==true){
@@ -241,6 +242,37 @@ void Executor::rePopulateQueues(msg_check *msg){
                            }
     }
     else{
+
+        EV<<"check completed cArray"<<endl;
+
+        for (cArray::Iterator it(completedJob); !it.end(); ++it) {
+            cObject *obj = *it;
+            msg_check *tmp,*duplicate;
+
+            duplicate = check_and_cast<msg_check *>(obj);
+            tmp=duplicate->dup();
+            if(tmp->getOriginalExecId()==myId)
+            {
+                tmp->setStatusRequest(true);
+                tmp->setAck(true);
+                tmp->setIsEnded(true);
+
+                EV<<"During Reboot Found JobId in my completed jobs(original): "<<tmp->getRelativeJobId()<<endl;
+                portId=tmp->getClientId()-1;
+                send(tmp,"exec$o",portId);
+            }
+            else{
+                tmp->setStatusRequest(true);
+                tmp->setAck(true);
+                tmp->setIsEnded(true);
+
+                EV << "During Reboot Sending the status to original exec: "<<tmp->getRelativeJobId()<<endl;
+                send(tmp,"load_send",tmp->getOriginalExecId());
+            }
+
+
+        }
+
         EV<<"The backup process is over, executor is now in normal execution mode"<<endl<<".........."<<endl;
         bubble("Normal mode");
         failure=false;//until I have recovered all the backup message I will still ignore all the other messages

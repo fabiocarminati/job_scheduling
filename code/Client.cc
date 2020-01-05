@@ -95,7 +95,7 @@ void Client::handleMessage(cMessage *cmsg) {
             if(msg->getStatusRequest()==true){
                 if(msg->getAck()==true){
                     if(msg->getIsEnded()==true){
-                        EV<<"Completed: "<<jobId<<endl;
+                        EV<<"Current Status Completed for "<<jobId<<endl;
                         executor = msg->getOriginalExecId();
                         send(msg->dup(),"user$o",executor);
                         //delete the job from the list of the job currently in processing
