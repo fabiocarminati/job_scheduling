@@ -113,21 +113,26 @@ void Client::handleMessage(cMessage *cmsg) {
                             }
                     }
                     else{
-                        EV<<"Not completed: "<<jobId<<" will be reasked later"<<endl;
+                        EV<<"Not completed: "<<jobId<<endl;
 
-                                obj = noStatusInfo.remove(jobId);
-                                if (obj!=nullptr){
-                                   message = check_and_cast<msg_check *>(obj);
-                                   EV << "Job not completely processed yet:we will reask his status later "<<message->getRelativeJobId()<<endl;
-                                   msgStore = message->dup();
-                                   notComputed.add(msgStore);
-
-                                }
-                                else
-                                   EV << "FATAL ERROR: Erasing in executor from the completed job queue: "<<jobId<<endl;
+                        obj = noStatusInfo.remove(jobId);//if doesn't exist?
+                        if (obj!=nullptr){
+                           message = check_and_cast<msg_check *>(obj);
+                           EV << "Job not completely processed yet:we will reAask his status later "<<message->getRelativeJobId()<<endl;
+                           msgStore = message->dup();
+                           notComputed.add(msgStore);
 
                         }
+                        else{
+                            obj = notComputed.remove(jobId);
+                            if (obj!=nullptr)
+                                EV<<"pkt whose status should be reasked in the future will be removed from the client"<<endl;
+                            else
+                                EV << "FATAL ERROR::pkt isn't in any of the client queues"<<jobId<<endl;
+                        }
+
                     }
+                }
 
 
             }
@@ -164,13 +169,13 @@ void Client::jobStatusHandler(){
         obj = notComputed.remove(i);
         if (obj!=nullptr){
            message = check_and_cast<msg_check *>(obj);
-           EV << "Remove from notCompleted cArray "<<message->getRelativeJobId()<<endl;
+           //EV << "Remove from notCompleted cArray "<<message->getRelativeJobId()<<endl;
            msgStore = message->dup();
            noStatusInfo.add(msgStore);
 
         }
         else
-           EV << "FATAL ERROR: Erasing in executor from the completed job queue: "<<endl;
+           EV << "FATAL ERROR: Erasing in executor from the notComputed queue: "<<endl;
 
         message->setStatusRequest(true);
         executor = message->getOriginalExecId();

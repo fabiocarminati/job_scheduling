@@ -209,6 +209,7 @@ void Executor::failureEvent(double prob){
 void Executor::rePopulateQueues(msg_check *msg){
     msg_check *msgSend;
     int portId;
+    int jobId;
     if(msg->getBackupComplete()==false){
         msg->setReBoot(false);
         if(msg->getNewJobsQueue()==true){
@@ -251,27 +252,111 @@ void Executor::rePopulateQueues(msg_check *msg){
 
             duplicate = check_and_cast<msg_check *>(obj);
             tmp=duplicate->dup();
+            jobId=tmp->getRelativeJobId();
             if(tmp->getOriginalExecId()==myId)
             {
                 tmp->setStatusRequest(true);
                 tmp->setAck(true);
                 tmp->setIsEnded(true);
 
-                EV<<"During Reboot Found JobId in my completed jobs(original): "<<tmp->getRelativeJobId()<<endl;
+                EV<<"During Reboot Found JobId in my completed jobs(original): "<<jobId<<endl;
                 portId=tmp->getClientId()-1;
                 send(tmp,"exec$o",portId);
             }
-            else{
+            else{//questo caso non viene trattato nel modo giusto nella funzione di status(elimino il pkt da completedJob in original exec senza fare altro
                 tmp->setStatusRequest(true);
                 tmp->setAck(true);
                 tmp->setIsEnded(true);
 
-                EV << "During Reboot Sending the status to original exec: "<<tmp->getRelativeJobId()<<endl;
+                EV << "During Reboot Sending the COMPLETED status to original exec: "<<jobId<<endl;
                 send(tmp,"load_send",tmp->getOriginalExecId());
             }
 
 
         }
+
+
+        for (cArray::Iterator it(reRoutedJobs); !it.end(); ++it) {
+            cObject *obj = *it;
+            msg_check *tmp,*duplicate;
+            int actualExecutorId;
+
+            duplicate = check_and_cast<msg_check *>(obj);
+            tmp=duplicate->dup();
+            jobId=tmp->getRelativeJobId();
+            actualExecutorId = tmp->getActualExecId();
+
+            tmp->setStatusRequest(true);
+            tmp->setAck(false);
+            tmp->setReRouted(true);
+            tmp->setIsEnded(false);
+
+            EV << "During Reboot Sending the STATUS request for the REROUTED JOB "<<jobId<<" to the actual executor "<<actualExecutorId<<endl;
+            send(tmp,"load_send",actualExecutorId);
+
+
+        }
+
+        for (cQueue::Iterator it(jobQueue);!it.end(); ++it) {
+            cObject *obj = *it;
+            msg_check *msgSend,*tmp;
+            msgSend = check_and_cast<msg_check *>(obj);
+            jobId=msgSend->getRelativeJobId();
+
+            if(msgSend->getOriginalExecId()==myId)
+            {
+                tmp=msgSend->dup();
+                tmp->setStatusRequest(true);
+                tmp->setAck(true);
+                tmp->setIsEnded(false);
+
+                EV<<"During Reboot Found JobId in my jobQueue(original): "<<jobId<<endl;
+                portId=tmp->getClientId()-1;
+
+                send(tmp,"exec$o",portId);
+            }
+            else{
+                //problema nel caso in cui comunico all original exec
+                //questo caso non viene trattato nel modo giusto nella funzione di handleStatus(elimino il pkt da completedJob in original exec senza fare altro oppure se
+                //il job non e stato ancora completato non faccio proprio nulla
+                tmp=msgSend->dup();
+                tmp->setStatusRequest(true);
+                tmp->setAck(true);
+                tmp->setIsEnded(false);
+
+                EV << "During Reboot Sending the NOT COMPLETED status to original exec: "<<jobId<<endl;
+                send(tmp,"load_send",tmp->getOriginalExecId());
+            }
+
+
+        }
+        for (cQueue::Iterator it(newJobsQueue);!it.end(); ++it) {
+            cObject *obj = *it;
+            msg_check *msgSend,*tmp;
+            msgSend = check_and_cast<msg_check *>(obj);
+            jobId=msgSend->getRelativeJobId();
+
+
+            if(msgSend->getOriginalExecId()==myId)
+            {
+                tmp=msgSend->dup();
+                tmp->setStatusRequest(true);
+                tmp->setAck(true);
+                tmp->setIsEnded(false);
+
+                EV<<"During Reboot Found JobId in my newJobsQueue(original): "<<jobId<<endl;
+                portId=tmp->getClientId()-1;
+
+                send(tmp,"exec$o",portId);
+            }
+            else
+                EV<<"this packet is in the wrong queue"<<endl;
+
+
+        }
+
+
+
 
         EV<<"The backup process is over, executor is now in normal execution mode"<<endl<<".........."<<endl;
         bubble("Normal mode");
@@ -519,6 +604,7 @@ void Executor::statusRequestHandler(msg_check *msg){
              portId = msg->getClientId()-1;
              tmp = msg->dup();
              tmp->setReRouted(false);
+             tmp->setActualExecId(tmp->getOriginalExecId());
              send(tmp,"exec$o",portId);
          }
       }else{//because the client will reply to the status reply
@@ -562,6 +648,7 @@ void Executor::statusRequestHandler(msg_check *msg){
                 tmp->setIsEnded(true);
                 EV<<"Found JobId in my completed jobs(original): "<<jobId<<endl;
                 portId=tmp->getClientId()-1;
+                tmp->setActualExecId(tmp->getOriginalExecId());
                 send(tmp,"exec$o",portId);
             }else{
                 obj = reRoutedJobs.get(jobId);
@@ -582,6 +669,7 @@ void Executor::statusRequestHandler(msg_check *msg){
                     tmp->setAck(true);
                     tmp->setIsEnded(false);
                     portId=tmp->getClientId()-1;
+                    tmp->setActualExecId(tmp->getOriginalExecId());
                     send(tmp,"exec$o",portId);
                 }
             }
