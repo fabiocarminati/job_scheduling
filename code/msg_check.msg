@@ -1,9 +1,9 @@
 packet msg_check //name of the new type of message 
 {
-    int RelativeJobId;
-    int ClientId;
-    int OriginalExecId;
-    int ActualExecId;
+    unsigned int RelativeJobId;
+    unsigned int ClientId;
+    unsigned int OriginalExecId;
+    unsigned int ActualExecId;
     simtime_t JobComplexity;
     int QueueLength;
     bool StatusRequest;

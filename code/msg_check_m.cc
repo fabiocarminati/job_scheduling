@@ -298,42 +298,42 @@ void msg_check::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->EndingTime);
 }
 
-int msg_check::getRelativeJobId() const
+unsigned int msg_check::getRelativeJobId() const
 {
     return this->RelativeJobId;
 }
 
-void msg_check::setRelativeJobId(int RelativeJobId)
+void msg_check::setRelativeJobId(unsigned int RelativeJobId)
 {
     this->RelativeJobId = RelativeJobId;
 }
 
-int msg_check::getClientId() const
+unsigned int msg_check::getClientId() const
 {
     return this->ClientId;
 }
 
-void msg_check::setClientId(int ClientId)
+void msg_check::setClientId(unsigned int ClientId)
 {
     this->ClientId = ClientId;
 }
 
-int msg_check::getOriginalExecId() const
+unsigned int msg_check::getOriginalExecId() const
 {
     return this->OriginalExecId;
 }
 
-void msg_check::setOriginalExecId(int OriginalExecId)
+void msg_check::setOriginalExecId(unsigned int OriginalExecId)
 {
     this->OriginalExecId = OriginalExecId;
 }
 
-int msg_check::getActualExecId() const
+unsigned int msg_check::getActualExecId() const
 {
     return this->ActualExecId;
 }
 
-void msg_check::setActualExecId(int ActualExecId)
+void msg_check::setActualExecId(unsigned int ActualExecId)
 {
     this->ActualExecId = ActualExecId;
 }
@@ -681,10 +681,10 @@ const char *msg_checkDescriptor::getFieldTypeString(int field) const
         field -= basedesc->getFieldCount();
     }
     static const char *fieldTypeStrings[] = {
-        "int",
-        "int",
-        "int",
-        "int",
+        "unsigned int",
+        "unsigned int",
+        "unsigned int",
+        "unsigned int",
         "simtime_t",
         "int",
         "bool",
@@ -770,10 +770,10 @@ std::string msg_checkDescriptor::getFieldValueAsString(void *object, int field, 
     }
     msg_check *pp = (msg_check *)object; (void)pp;
     switch (field) {
-        case 0: return long2string(pp->getRelativeJobId());
-        case 1: return long2string(pp->getClientId());
-        case 2: return long2string(pp->getOriginalExecId());
-        case 3: return long2string(pp->getActualExecId());
+        case 0: return ulong2string(pp->getRelativeJobId());
+        case 1: return ulong2string(pp->getClientId());
+        case 2: return ulong2string(pp->getOriginalExecId());
+        case 3: return ulong2string(pp->getActualExecId());
         case 4: return simtime2string(pp->getJobComplexity());
         case 5: return long2string(pp->getQueueLength());
         case 6: return bool2string(pp->getStatusRequest());
@@ -805,10 +805,10 @@ bool msg_checkDescriptor::setFieldValueAsString(void *object, int field, int i, 
     }
     msg_check *pp = (msg_check *)object; (void)pp;
     switch (field) {
-        case 0: pp->setRelativeJobId(string2long(value)); return true;
-        case 1: pp->setClientId(string2long(value)); return true;
-        case 2: pp->setOriginalExecId(string2long(value)); return true;
-        case 3: pp->setActualExecId(string2long(value)); return true;
+        case 0: pp->setRelativeJobId(string2ulong(value)); return true;
+        case 1: pp->setClientId(string2ulong(value)); return true;
+        case 2: pp->setOriginalExecId(string2ulong(value)); return true;
+        case 3: pp->setActualExecId(string2ulong(value)); return true;
         case 4: pp->setJobComplexity(string2simtime(value)); return true;
         case 5: pp->setQueueLength(string2long(value)); return true;
         case 6: pp->setStatusRequest(string2bool(value)); return true;

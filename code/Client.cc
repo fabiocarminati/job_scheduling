@@ -7,8 +7,8 @@ using namespace omnetpp;
 
 class Client : public cSimpleModule {
 private:
-  int sourceID;
-  int nbGenMessages;
+  int clientId;
+  unsigned int nbGenMessages;
   int E;
   int maxRetry;
   msg_check *sendNewJob;
@@ -48,6 +48,7 @@ Client::~Client()
 {
     cancelAndDelete(timeoutAckNewJob);
     cancelAndDelete(sendNewJob);
+    cancelAndDelete(checkJobStatus);
 }
 
 void Client::initialize() {
@@ -73,20 +74,16 @@ void Client::initialize() {
     timeoutAckNewJob = new msg_check("timeoutAckNewJob");
     checkJobStatus = new msg_check("checkJobStatus");
     nbGenMessages=0;
-    sourceID=getId()-1;   //defines the Priority-ID of the message that each source will transmit(different sources send different priorities messages)
-    //EV<<"Client ID "<<sourceID<<endl;
+    clientId=getIndex();
+
     scheduleAt(simTime() + timeoutStatus, checkJobStatus);
     scheduleAt(simTime() + interArrivalTime, sendNewJob);
-
-
-
-
 }
 
 void Client::handleMessage(cMessage *cmsg) {
-    int executor;
+    unsigned int executor;
     cObject *obj;
-    msg_check *msgStore,*message;
+    msg_check *message;
     simtime_t interArrivalTime,realComputationTime;
     // Casting from cMessage to msg_check
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
@@ -100,9 +97,9 @@ void Client::handleMessage(cMessage *cmsg) {
                     if(msg->getIsEnded()==true){
                         EV<<"Current Status Completed for "<<jobId<<endl;
                         executor = msg->getOriginalExecId();
-                        send(msg->dup(),"user$o",executor);
-                        //delete the job from the list of the job currently in processing
                         realComputationTime=msg->getEndingTime()-msg->getStartingTime();
+                        send(msg,"user$o",executor);
+                        //delete the job from the list of the job currently in processing
                         EV<<"real computation time measured "<<realComputationTime<<endl;
                         emit(realTimeSignal,realComputationTime);
                         if(noStatusInfo.exist(jobId))
@@ -118,23 +115,22 @@ void Client::handleMessage(cMessage *cmsg) {
                         obj = noStatusInfo.remove(jobId);//if doesn't exist?
                         if (obj!=nullptr){
                            message = check_and_cast<msg_check *>(obj);
-                           EV << "Job not completely processed yet:we will reAask his status later "<<message->getRelativeJobId()<<endl;
-                           msgStore = message->dup();
-                           notComputed.add(msgStore);
-
+                           EV << "Job not processed yet:we will reAask his status later "<<message->getName()<<endl;
+                           notComputed.add(message);
                         }
-                        else{
+                        /* questo ramo else non ho ben capito cosa faccia, se l'executor manda al client
+                         * che il job non è completato come mai lo rimuoviamo da  notComputed?
+                         *else{
                             obj = notComputed.remove(jobId);
                             if (obj!=nullptr)
                                 EV<<"pkt whose status should be reasked in the future will be removed from the client"<<endl;
                             else
                                 EV << "FATAL ERROR::pkt isn't in any of the client queues"<<jobId<<endl;
-                        }
-
+                        }*/
+                        delete msg;
                     }
-                }
-
-
+                }else
+                    delete msg;
             }
             else //received the ack from the executor, the job was received correctly
                 if(msg->getNewJob()){
@@ -151,39 +147,39 @@ void Client::handleMessage(cMessage *cmsg) {
                         EV<<"Interarrival time "<<interArrivalTime<<endl;
                         //re-start the timer for new jobs
                         scheduleAt(simTime()+interArrivalTime, sendNewJob);
-                    }
-                }
+                    }else
+                        delete msg;
+                }else
+                    delete msg;
 
 }
 
 
 
 void Client::jobStatusHandler(){
-    int i;
+  /*  int i;
     msg_check *message,*msgStore;
     cObject *obj;
     int executor;
 
     for (i = 0;i < notComputed.size();i++){
-
         obj = notComputed.remove(i);
         if (obj!=nullptr){
            message = check_and_cast<msg_check *>(obj);
            //EV << "Remove from notCompleted cArray "<<message->getRelativeJobId()<<endl;
            msgStore = message->dup();
            noStatusInfo.add(msgStore);
-
         }
         else
            EV << "FATAL ERROR: Erasing in executor from the notComputed queue: "<<endl;
 
         message->setStatusRequest(true);
         executor = message->getOriginalExecId();
-        EV<<"Asking the status of: "<<message->getOriginalExecId()<<"-"<<message->getRelativeJobId()<<endl;
+        EV<<"Asking the status of: "<<message->getName()<<endl;
         send(message,"user$o",executor);
 
     }
-    scheduleAt(simTime() + timeoutStatus, checkJobStatus);
+    scheduleAt(simTime() + timeoutStatus, checkJobStatus);*/
 }
 
 
@@ -198,7 +194,7 @@ void Client::selfMessage(msg_check *msg){
         //EV<<"maxRetry in normal mode "<<maxRetry<<endl;
         char msgname[20];
         ++nbGenMessages; //Total number of packets sent by a specific source(thus with the same priority) up to now
-        sprintf(msgname, "message%d-#%d", sourceID, nbGenMessages);
+        sprintf(msgname, "message%d-#%d", clientId, nbGenMessages);
 
         //select the executor among a set of uniform values
 
@@ -213,7 +209,7 @@ void Client::selfMessage(msg_check *msg){
         emit(avgComplexitySignal,jobComplexity);
         EV<<"job complexity "<<jobComplexity<<endl;
         message->setRelativeJobId(0); //will be useful for computing the per class extended service time
-        message->setClientId(sourceID);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
+        message->setClientId(clientId);  //initialize to 0 the time when a packet goes for he first time to service(useful for extended per class service time)
         message->setActualExecId(executor);
         message->setOriginalExecId(executor);
         message->setQueueLength(0);
@@ -228,7 +224,6 @@ void Client::selfMessage(msg_check *msg){
         msg_to_ack=message->dup();
         send(message,"user$o",executor);  //send the message to the queue
         scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);//waiting ack
-
     }
     else
         //if the message is a timeout event the message it is re-sent to the executor
@@ -255,6 +250,6 @@ void Client::selfMessage(msg_check *msg){
         }
         else
            if(msg == checkJobStatus){
-             jobStatusHandler();
+            // jobStatusHandler();
            }
 }
