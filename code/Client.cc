@@ -69,7 +69,6 @@ void Client::initialize() {
 
     emit(avgSendingRateSignal,interArrivalTime);
 
-
     sendNewJob = new msg_check("sendNewJob");
     timeoutAckNewJob = new msg_check("timeoutAckNewJob");
     checkJobStatus = new msg_check("checkJobStatus");
@@ -154,10 +153,8 @@ void Client::handleMessage(cMessage *cmsg) {
 
 }
 
-
-
 void Client::jobStatusHandler(){
-  /*  int i;
+    int i;
     msg_check *message,*msgStore;
     cObject *obj;
     int executor;
@@ -169,23 +166,19 @@ void Client::jobStatusHandler(){
            //EV << "Remove from notCompleted cArray "<<message->getRelativeJobId()<<endl;
            msgStore = message->dup();
            noStatusInfo.add(msgStore);
+           message->setStatusRequest(true);
+           executor = message->getOriginalExecId();
+           EV<<"Asking the status of: "<<message->getName()<<endl;
+           send(message,"user$o",executor);
         }
         else
            EV << "FATAL ERROR: Erasing in executor from the notComputed queue: "<<endl;
-
-        message->setStatusRequest(true);
-        executor = message->getOriginalExecId();
-        EV<<"Asking the status of: "<<message->getName()<<endl;
-        send(message,"user$o",executor);
-
     }
-    scheduleAt(simTime() + timeoutStatus, checkJobStatus);*/
+    scheduleAt(simTime() + timeoutStatus, checkJobStatus);
 }
-
 
 void Client::selfMessage(msg_check *msg){
     int executor;
-
     msg_check *message;
     simtime_t jobComplexity;
 
@@ -197,9 +190,7 @@ void Client::selfMessage(msg_check *msg){
         sprintf(msgname, "message%d-#%d", clientId, nbGenMessages);
 
         //select the executor among a set of uniform values
-
         executor=rand() % E;
-
 
         message = new msg_check(msgname);
         message->setStatusRequest(false);
@@ -228,14 +219,11 @@ void Client::selfMessage(msg_check *msg){
     else
         //if the message is a timeout event the message it is re-sent to the executor
         if (msg==timeoutAckNewJob) {
-
             if(maxRetry)
                 maxRetry--;
             else{
                maxRetry=par("maxRetry");
-
                executor=rand() % E;
-
                while(executor==msg_to_ack->getOriginalExecId())
                    executor=rand() % E;
                msg_to_ack->setActualExecId(executor);
@@ -250,6 +238,6 @@ void Client::selfMessage(msg_check *msg){
         }
         else
            if(msg == checkJobStatus){
-            // jobStatusHandler();
+             jobStatusHandler();
            }
 }

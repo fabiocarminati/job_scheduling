@@ -180,7 +180,6 @@ void Executor::failureEvent(double prob){
     if(!failure){
         if(uniform(0,1)<prob){
          failure=true;
-         //outGoingPacket.clear();
          newJobsQueue.clear();
          jobQueue.clear();
          balanceResponses.clear();
@@ -386,6 +385,7 @@ void Executor::balancedJob(msg_check *msg){
              failureEvent(probCrashDuringExecution);
              if(failure){
                  EV<<"crash when sending load balancing requests "<<endl;
+                 delete msgSend;
                  return;
              }
              send(msgSend,"load_send",i);
@@ -750,7 +750,6 @@ void Executor::timeoutLoadBalancingHandler(){
 }
 
 void Executor::timeoutJobExecutionHandler(){
-    return ;
     const char *jobId;
     int portId;
     simtime_t timeoutJobComplexity;
@@ -767,15 +766,12 @@ void Executor::timeoutJobExecutionHandler(){
     msgSend->setJobQueue(true);
     send(msgSend,"backup_send$o");
 
+    msgServiced->setEndingTime(simTime());
     msgSend = msgServiced->dup();
-    msgSend->setEndingTime(simTime());
-    completedJob.add(msgSend);
-
-
-    msgSend= msgServiced;
     msgSend->setCompletedQueue(true);
     send(msgSend,"backup_send$o");
 
+    completedJob.add(msgServiced);
 
     /*
     B)Then the executor decides which packet it should process next:
