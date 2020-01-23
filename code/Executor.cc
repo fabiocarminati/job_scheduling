@@ -2,8 +2,7 @@
 #include <omnetpp.h>
 #include <msg_check_m.h>  //fare parsing
 #include <map>
-#define CLUSTER_SIZE 1000
-#define QUEUE_SIZE 10000000
+
 using namespace omnetpp;
 class Executor : public cSimpleModule {
 private:
@@ -23,7 +22,7 @@ private:
     bool probingMode,failure;
 
     unsigned int jobCompleted;
-    unsigned int nArrived;
+    unsigned int nNewJobArrived;
 
     cArray completedJob;
     cQueue newJobsQueue;
@@ -32,7 +31,7 @@ private:
     cArray reRoutedJobs;
 
     void selfMessage(msg_check *msg);
-    void newJob(msg_check *msg);
+    void newJobHandler(msg_check *msg);
     void balancedJob(msg_check *msg);
     void probeHandler(msg_check *msg);
     void statusRequestHandler(msg_check *msg);
@@ -44,6 +43,7 @@ private:
     void restartNormalMode();
     bool checkDuplicate(msg_check *msg);
     void updateJobsStatus();
+
 protected:
     virtual void initialize();// override;
     virtual void handleMessage(cMessage *cmsg);// override;
@@ -53,7 +53,6 @@ public:
   simtime_t interArrivalTime;
   Executor();
   ~Executor();
-
 
 };
 Define_Module(Executor);
@@ -84,7 +83,7 @@ void Executor::initialize() {
     timeoutEndActual = par("timeoutEndActual")+2*channelDelay;
     EV<<"load "<<timeoutLoad<<" failure "<<timeoutFailure<<" end "<<timeoutEndActual<<endl;
     myId=getIndex();
-    nArrived=0;
+    nNewJobArrived=0;
     jobCompleted=0;
     probEvent=par("probEvent");
     probCrashDuringExecution=par("probCrashDuringExecution");
@@ -97,15 +96,8 @@ void Executor::initialize() {
 }
 
 void Executor::handleMessage(cMessage *cmsg) {
-   int i;
-   // Casting from cMessage to msg_check
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
    msg_check *msgSend;
-   std::string jobb_id;
-   std::string received;
-   const char * id,* job_id;
-   int machine;
-
 
    failureEvent(probEvent);
    if(failure){
@@ -133,7 +125,7 @@ void Executor::handleMessage(cMessage *cmsg) {
                selfMessage(msg);
          }else{
              if(msg->getNewJob()==true){
-                           newJob(msg);
+                           newJobHandler(msg);
                        }else if(msg->getProbing()==true){
                                 probeHandler(msg);
                              }else
@@ -230,7 +222,6 @@ void Executor::rePopulateQueues(msg_check *msg){
                                   msg->setCompletedQueue(false);
                                   completedJob.add(msg);
                                   EV<<"BACKUP in completed jobs"<<endl;
-
                            }
     }
     else{
@@ -245,7 +236,7 @@ void Executor::rePopulateQueues(msg_check *msg){
 void Executor::restartNormalMode(){
     msg_check *msgServiced;
     simtime_t timeoutJobComplexity;
-    int jobId,portId;
+    int jobId, clientId;
     EV<<"After recover Show me JOB "<<jobQueue.getLength()<<endl;
     EV<<"Show me NEW "<<newJobsQueue.getLength()<<endl;
     EV<<"Show me REROURTED "<<reRoutedJobs.size()<<endl;
@@ -262,10 +253,10 @@ void Executor::restartNormalMode(){
     else{
          msgServiced = check_and_cast<msg_check *>(jobQueue.front());
          jobId = msgServiced->getRelativeJobId();
-         portId = msgServiced->getClientId();
+         clientId = msgServiced->getClientId();
          timeoutJobComplexity = msgServiced->getJobComplexity();
          scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
-         EV<<"Starting service of "<<jobId<<" coming from user ID "<<portId<<" from the queue of the machine "<<msgServiced->getOriginalExecId()<<endl;
+         EV<<"Starting service of "<<jobId<<" coming from Client ID "<<clientId<<" from the queue of the machine "<<msgServiced->getOriginalExecId()<<endl;
     }
 }
 
@@ -294,7 +285,6 @@ void Executor::updateJobsStatus(){
             msgSend->setAck(true);
             msgSend->setIsEnded(true);
             msgSend->setReRouted(true);
-
             EV << "During Reboot Sending the COMPLETED status to original exec: "<<msgSend->getName()<<endl;
             send(msgSend,"load_send",msgSend->getOriginalExecId());
         }
@@ -370,7 +360,7 @@ void Executor::balancedJob(msg_check *msg){
     int i;
     int clientId;
     clientId=msg->getClientId();
-    EV<<"msg ID "<<msg->getRelativeJobId()<<" coming from user ID "<<clientId<<" trying to distribute probing mode "<<probingMode<<endl;
+    EV<<"msg ID "<<msg->getRelativeJobId()<<" coming from Client ID "<<clientId<<" trying to distribute probing mode "<<probingMode<<endl;
     if(!probingMode){  //==-1 means that the coming msg has been forwarded by another machine after load balancing
         probingMode = true;
         msg->setStatusRequest(false);
@@ -449,7 +439,6 @@ void Executor::probeHandler(msg_check *msg){
 
                    probingMode = false;
                    balanceResponses.clear();
-
                    if(newJobsQueue.getLength()>0){
                        tmp = check_and_cast<msg_check *>(newJobsQueue.front());
                        balancedJob(tmp);
@@ -492,7 +481,6 @@ void Executor::reRoutedHandler(msg_check *msg){
              EV<<"The new executor is idle:it starts executing immediately the packet"<<endl;
              scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
         }
-
         EV<<"new job in the queue, actual length: "<< jobQueue.getLength()<<endl;
     }else{
         cancelEvent(timeoutReRouted);
@@ -527,21 +515,23 @@ void Executor::statusRequestHandler(msg_check *msg){
     if(msg->getAck()==true){
       EV << "ACK received for "<<jobId<<endl;
       if(msg->getReRouted()==true){
-         if(msg->getOriginalExecId()==myId){
+         if(msg->getOriginalExecId() == myId){
              if(msg->getIsEnded()){
-                 obj = reRoutedJobs.remove(jobId);
-                 if(obj!=nullptr){
-                     tmp = check_and_cast<msg_check *>(obj);
-                     EV << "Erasing from the rerouted jobs the job: "<<msg->getOriginalExecId() <<"-"<<msg->getRelativeJobId()<<endl;
-                     tmp->setReRoutedJobQueue(true);
-                     send(tmp,"backup_send$o");//notify erase in rerouted job queue to the storage
+                 if(msg->getRelativeJobId() <= nNewJobArrived){
+                     obj = reRoutedJobs.remove(jobId);
+                     if(obj!=nullptr){
+                         tmp = check_and_cast<msg_check *>(obj);
+                         EV << "Erasing from the rerouted jobs the job: "<<jobId<<endl;
+                         tmp->setReRoutedJobQueue(true);
+                         send(tmp,"backup_send$o");//notify erase in rerouted job queue to the storage
+                     }
+                     portId = msg->getActualExecId();
+                     tmp = msg->dup();
+                     tmp->setReRouted(false);
+                     send(tmp,"load_send",portId);
+                 }else{
+                     EV << "FATAL ERROR: Erasing in executor from the re-routed job queue: "<<jobId<<endl;
                  }
-                 portId = msg->getActualExecId();
-                 tmp = msg->dup();
-                 tmp->setReRouted(false);
-                 //EV<<"send remove rerouted after STATUS REQUEST"<<endl;
-
-                 send(tmp,"load_send",portId);
              }
              portId = msg->getClientId();
              tmp = msg->dup();
@@ -620,22 +610,21 @@ void Executor::statusRequestHandler(msg_check *msg){
     delete msg;
 }
 
-void Executor::newJob(msg_check *msg){
+void Executor::newJobHandler(msg_check *msg){
     msg_check *msgSend;
     const char *id;
     std::string jobId;
     int machine, clientId;
     simtime_t timeoutJobComplexity;
-    nArrived++;
+    nNewJobArrived++;
     //Create the JobId
     machine=msg->getOriginalExecId();
-    //jobId="Job ID: ";
     jobId.append(std::to_string(machine));
     jobId.append("-");
-    jobId.append(std::to_string(nArrived));
+    jobId.append(std::to_string(nNewJobArrived));
     id=jobId.c_str();
     //save the message to the stable storage
-    msg->setRelativeJobId(nArrived);
+    msg->setRelativeJobId(nNewJobArrived);
 
     //Reply to the client
     clientId=msg->getClientId();
@@ -643,40 +632,35 @@ void Executor::newJob(msg_check *msg){
     msgSend=msg->dup();
     msgSend->setAck(true);
     send(msgSend,"exec$o",clientId);
-    EV<<"First time the packet is in the cluster:define his "<<id<<endl;
+    EV<<"First time the packet is in the cluster:define his Job Id"<<id<<endl;
     msg->setNewJob(false);
-
     if(jobQueue.isEmpty()){
         jobQueue.insert(msg->dup());
-
         timeoutJobComplexity = msg->getJobComplexity();
-        msgSend=msg;
+        msgSend = msg;
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
-
-        if(!timeoutJobComputation->isScheduled()){
-            EV<<"New message arrived with idle server:execute it immediately:Job Id "<<id<<endl;
-            scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
-        }
+        EV<<"New message arrived with idle serve: execute it immediately. Job Id "<<id<<endl;
+        scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
     }else{
-            if(skipLoad==1){
-                    msgSend=msg->dup();
-                    msgSend->setNewJobsQueue(true);
-                    send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
-                    EV<<"Perform load this time; granularity: "<<granularity<<endl;
-                    newJobsQueue.insert(msg);
-                    skipLoad=granularity;
-                    balancedJob(msg);
-                }
-                else{
-                    skipLoad--;
-                    jobQueue.insert(msg->dup());
-                    EV<<"partial "<<skipLoad<<" versus granularity "<<granularity<<endl;
-                    msgSend=msg;
-                    msgSend->setJobQueue(true);
-                    send(msgSend,"backup_send$o");
-                }
+        if(skipLoad==1){
+            msgSend=msg->dup();
+            msgSend->setNewJobsQueue(true);
+            send(msgSend,"backup_send$o");//send a copy of backup to the storage to cope with possible failure
+            EV<<"Perform load this time; granularity: "<<granularity<<endl;
+            newJobsQueue.insert(msg);
+            skipLoad=granularity;
+            balancedJob(msg);
         }
+        else{
+            skipLoad--;
+            jobQueue.insert(msg->dup());
+            EV<<"partial "<<skipLoad<<" versus granularity "<<granularity<<endl;
+            msgSend=msg;
+            msgSend->setJobQueue(true);
+            send(msgSend,"backup_send$o");
+        }
+    }
 }
 
 void Executor::timeoutLoadBalancingHandler(){
@@ -751,15 +735,15 @@ void Executor::timeoutLoadBalancingHandler(){
 
 void Executor::timeoutJobExecutionHandler(){
     const char *jobId;
-    int portId;
+    int clientId;
     simtime_t timeoutJobComplexity;
     msg_check *msgServiced,*msgSend;
     // Get the source_id of the message that just finished service
 
     msgServiced = check_and_cast<msg_check *>(jobQueue.pop());
     jobId = msgServiced->getName();
-    portId = msgServiced->getClientId();  //Source id-1=portId
-    EV<<"Completed job: "<<jobId<<" creating by the user ID "<<portId<<endl;
+    clientId = msgServiced->getClientId();
+    EV<<"Completed job: "<<jobId<<" creating by the Client ID "<<clientId<<endl;
     jobCompleted++;
 
     msgSend = msgServiced->dup();
@@ -783,19 +767,16 @@ void Executor::timeoutJobExecutionHandler(){
     else{
          msgServiced = check_and_cast<msg_check *>(jobQueue.front());
          jobId = msgServiced->getName();
-         portId = msgServiced->getClientId();
+         clientId = msgServiced->getClientId();
          timeoutJobComplexity = msgServiced->getJobComplexity();
          scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
-         EV<<"Starting job"<<jobId<<" coming from user ID "<<portId<<endl;
+         EV<<"Starting job"<<jobId<<" coming from Client ID "<<clientId<<endl;
     }
-
 }
-
 
 //called in the self message function
 
 void Executor::selfMessage(msg_check *msg){
-    int portId;
     msg_check *msgServiced;
 
     if(msg==timeoutReRouted){
@@ -827,12 +808,11 @@ void Executor::selfMessage(msg_check *msg){
               ->It will notify the client the end of the computation.
 
        */
-
            if (msg == timeoutJobComputation){
               timeoutJobExecutionHandler();
-
            }
 }
+
 void Executor::finish()
 {
     EV<<"completed jobs "<<jobCompleted<<endl;

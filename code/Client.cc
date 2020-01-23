@@ -14,7 +14,7 @@ private:
   msg_check *sendNewJob;
   msg_check *timeoutAckNewJob;
   msg_check *checkJobStatus;
-  msg_check *msg_to_ack;
+  msg_check *msgToAck;
   simtime_t timeoutAck;
   simtime_t timeoutStatus;
   simtime_t channelDelay;
@@ -41,7 +41,7 @@ Define_Module(Client);
 
 Client::Client()
 {
-    checkJobStatus = timeoutAckNewJob = sendNewJob = msg_to_ack = nullptr;
+    checkJobStatus = timeoutAckNewJob = sendNewJob = msgToAck = nullptr;
 }
 
 Client::~Client()
@@ -49,6 +49,8 @@ Client::~Client()
     cancelAndDelete(timeoutAckNewJob);
     cancelAndDelete(sendNewJob);
     cancelAndDelete(checkJobStatus);
+    if(msgToAck != nullptr)
+        delete msgToAck;
 }
 
 void Client::initialize() {
@@ -56,12 +58,12 @@ void Client::initialize() {
     simtime_t interArrivalTime;
 
     channelDelay= par("channelDelay");
-    timeoutAck=par("timeoutAck")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
-    timeoutStatus=par("timeoutStatus")+2*channelDelay;
+    timeoutAck = par("timeoutAck")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
+    timeoutStatus = par("timeoutStatus")+2*channelDelay;
     EV<<"ack "<<timeoutAck<<" status "<<timeoutStatus<<endl;
     E = par("E"); //non volatile parameters --once defined they never change
-    interArrivalTime=exponential(par("interArrivalTime").doubleValue()); //simulate an exponential generation of packets
-    maxRetry=par("maxRetry");
+    interArrivalTime = exponential(par("interArrivalTime").doubleValue()); //simulate an exponential generation of packets
+    maxRetry = par("maxRetry");
 
     avgSendingRateSignal = registerSignal("avgSendingRate");
     avgComplexitySignal = registerSignal("avgComplexity");
@@ -83,12 +85,12 @@ void Client::handleMessage(cMessage *cmsg) {
     unsigned int executor;
     cObject *obj;
     msg_check *message;
-    simtime_t interArrivalTime,realComputationTime;
-    // Casting from cMessage to msg_check
+    simtime_t interArrivalTime, realComputationTime;
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
     const char  *jobId;
+
     jobId = msg->getName();
-   if(msg->isSelfMessage())
+    if(msg->isSelfMessage())
        selfMessage(msg);
         else
             if(msg->getStatusRequest()==true){
@@ -110,7 +112,6 @@ void Client::handleMessage(cMessage *cmsg) {
                     }
                     else{
                         EV<<"Not completed: "<<jobId<<endl;
-
                         obj = noStatusInfo.remove(jobId);//if doesn't exist?
                         if (obj!=nullptr){
                            message = check_and_cast<msg_check *>(obj);
@@ -139,7 +140,8 @@ void Client::handleMessage(cMessage *cmsg) {
                         notComputed.add(msg);
                         EV << "ACK received for "<<jobId<<endl;
                         cancelEvent(timeoutAckNewJob);
-                        delete msg_to_ack;
+                        delete msgToAck;
+                        msgToAck = nullptr;
                         //simulate an exponential generation of packets
                         interArrivalTime=exponential(par("interArrivalTime").doubleValue());
                         emit(avgSendingRateSignal,interArrivalTime);
@@ -150,7 +152,6 @@ void Client::handleMessage(cMessage *cmsg) {
                         delete msg;
                 }else
                     delete msg;
-
 }
 
 void Client::jobStatusHandler(){
@@ -212,27 +213,27 @@ void Client::selfMessage(msg_check *msg){
         message->setStartingTime(simTime());
         message->setEndingTime(SIMTIME_ZERO);
         EV<<"msg sent to machine "<<executor<<endl;
-        msg_to_ack=message->dup();
+        msgToAck=message->dup();
         send(message,"user$o",executor);  //send the message to the queue
         scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);//waiting ack
     }
     else
         //if the message is a timeout event the message it is re-sent to the executor
-        if (msg==timeoutAckNewJob) {
+        if (msg == timeoutAckNewJob) {
             if(maxRetry)
                 maxRetry--;
             else{
                maxRetry=par("maxRetry");
                executor=rand() % E;
-               while(executor==msg_to_ack->getOriginalExecId())
+               while(executor==msgToAck->getOriginalExecId())
                    executor=rand() % E;
-               msg_to_ack->setActualExecId(executor);
-               msg_to_ack->setOriginalExecId(executor);
+               msgToAck->setActualExecId(executor);
+               msgToAck->setOriginalExecId(executor);
                EV<<"Change destination executor "<<endl;
             }
             //EV<<"maxretry when ack expired "<<maxRetry<<endl;
-            EV << "Timeout expired, re-sending message and restarting timer\n";
-            send(msg_to_ack->dup(),"user$o",msg_to_ack->getOriginalExecId());
+            EV << "Timeout expired, re-sending message and restarting timer"<<endl;
+            send(msgToAck->dup(),"user$o",msgToAck->getOriginalExecId());
             //start the timeout for the re-transmission
             scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);
         }
