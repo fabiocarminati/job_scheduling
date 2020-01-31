@@ -19,14 +19,15 @@
 
 
 /**
- * Class generated from <tt>msg_check.msg:2</tt> by nedtool.
+ * Class generated from <tt>msg_check.msg:3</tt> by nedtool.
  * <pre>
- * packet msg_check //name of the new type of message 
+ * //we define a new msg type with several fields
+ * packet msg_check
  * {
- *     int RelativeJobId;
- *     int ClientId;
- *     int OriginalExecId;
- *     int ActualExecId;
+ *     unsigned int RelativeJobId;
+ *     unsigned int ClientId;
+ *     unsigned int OriginalExecId;
+ *     unsigned int ActualExecId;
  *     simtime_t JobComplexity;
  *     int QueueLength;
  *     bool StatusRequest;
@@ -50,10 +51,10 @@
 class msg_check : public ::omnetpp::cPacket
 {
   protected:
-    int RelativeJobId;
-    int ClientId;
-    int OriginalExecId;
-    int ActualExecId;
+    unsigned int RelativeJobId;
+    unsigned int ClientId;
+    unsigned int OriginalExecId;
+    unsigned int ActualExecId;
     ::omnetpp::simtime_t JobComplexity;
     int QueueLength;
     bool StatusRequest;
@@ -89,14 +90,14 @@ class msg_check : public ::omnetpp::cPacket
     virtual void parsimUnpack(omnetpp::cCommBuffer *b) override;
 
     // field getter/setter methods
-    virtual int getRelativeJobId() const;
-    virtual void setRelativeJobId(int RelativeJobId);
-    virtual int getClientId() const;
-    virtual void setClientId(int ClientId);
-    virtual int getOriginalExecId() const;
-    virtual void setOriginalExecId(int OriginalExecId);
-    virtual int getActualExecId() const;
-    virtual void setActualExecId(int ActualExecId);
+    virtual unsigned int getRelativeJobId() const;
+    virtual void setRelativeJobId(unsigned int RelativeJobId);
+    virtual unsigned int getClientId() const;
+    virtual void setClientId(unsigned int ClientId);
+    virtual unsigned int getOriginalExecId() const;
+    virtual void setOriginalExecId(unsigned int OriginalExecId);
+    virtual unsigned int getActualExecId() const;
+    virtual void setActualExecId(unsigned int ActualExecId);
     virtual ::omnetpp::simtime_t getJobComplexity() const;
     virtual void setJobComplexity(::omnetpp::simtime_t JobComplexity);
     virtual int getQueueLength() const;

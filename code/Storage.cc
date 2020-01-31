@@ -2,9 +2,28 @@
 #include <omnetpp.h>
 #include <msg_check_m.h>
 #include <map>
-
-
 using namespace omnetpp;
+
+/*
+This class represents a secure storage(his content will never be lost).
+There is one secure storage for each executor.
+It can send and receive messages only to/from the correspondent executor
+It contains four distinct map functions which have the job ID as key and the job as value:
+     ->The map function newJobsQueue: the executor hasn't decided yet how to handle these messages.Several actions are possible:
+     1. Send the job to another executor in order to perform load balancing
+     2. Keep the job and execute it either immediately if idle or in the future
+     ->The map function jobQueue that contains all the messages waiting to be processed by that executor with a FIFO logic
+     ->The map function reRoutedQueue: keeps track of all the jobs sent to other executors due to load balancing.
+     ->The map function completedJobQueue: contains all the jobs whose execution is ended
+
+For the first three maps we are interesting in the evolution over time of their length so we define for them 3 signals.
+For the completedJobQueue we don't consider statistics because for how is defined in the Executor.cc his length is related not only to the
+number of completed jobs but also to the number and to frequency of the status requests made by the clients.
+Anyway in order to have an idea about the total number of completed jobs by each executor at the end of the simulation we print
+that value.
+
+Please notice that in this document we use job,message,packet as synonyms.
+ */
 
 class Storage : public cSimpleModule {
 private:
@@ -13,10 +32,9 @@ private:
     std::map<std::string, msg_check *> jobQueue;
     std::map<std::string, msg_check *> reRoutedQueue;
     std::map<std::string, msg_check *> completedJobQueue;
-    double totale;
+
     void searchMessage(std::string jobId,  msg_check *msg, std::map<std::string, msg_check *> *storedMap);
     void executorReboot(std::string jobId,std::map<std::string, msg_check *> *storedMap);
-    simtime_t channelDelay;
 
 
 
@@ -26,7 +44,6 @@ protected:
     virtual void finish() override;
     simsignal_t JobSignal;
     simsignal_t NewSignal;
-    //simsignal_t whyNotWorkSignal;
     simsignal_t ReRoutedSignal;
 
 
@@ -57,36 +74,39 @@ Storage::~Storage()
     for (search = completedJobQueue.begin();search != completedJobQueue.end(); ++search)
          delete search->second;
 }
+
 /*
- This class represents a secure storage(his content will never be lost).
- There is one secure storage for each executor,
- Is useful because is the place where we put
-     ->The map function newJobsQueue that contains all the messages(msg_check) arrived to an executor that has not
-     already either processed or queued them or forwarded them to other executors due to load balancing
-     ->The map function jobQueue that contains all the messages waiting to be processed by that executor
+INITIALIZE
+At the beginning of the simulation all the various queues are empty so we set equal to 0 the first emitted value for the signals representing
+the length of the jobQueue,newJobsQueue and reRouted
  */
 void Storage::initialize() {
     JobSignal = registerSignal("Job");
     NewSignal = registerSignal("NewJobs");
-    //whyNotWorkSignal = registerSignal("whyNotWork");
     ReRoutedSignal = registerSignal("ReRouted");
     emit(JobSignal, 0);
     emit(NewSignal, 0);
-    //totale=0;
-    //emit(whyNotWorkSignal,totale);
     emit(ReRoutedSignal, 0);
-    channelDelay = par("channelDelay");
-
-    //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
-
 }
+
+/*
+HANDLE MESSAGE
+Different actions according to the type of message received by the executor:
+    ->Message notifying that the executor has ended the failure mode:the storage will reply sending all the jobs contained in his four maps
+    followed by a final message with the flag BackupComplete=true so that the executor understands that the backup process is over.
+    ->Message notifying that a job must be put(removed) to(from) one of the four maps. After this operation the length of the map function
+    changes so an emit is done.
+
+Finally the incoming msg is deleted
+ */
+
+
 void Storage::handleMessage(cMessage *cmsg) {
    // Casting from cMessage to msg_check
    msg_check *msg = check_and_cast<msg_check *>(cmsg);
    msg_check *msgBackup;
    std::string jobId;
-   //totale++;
-   //emit(whyNotWorkSignal,totale);
+
    double jobIdLength,newJobIdLength,reRoutedJobIdLength,completedJobIdLength;
 
    jobId.append(std::to_string(msg->getOriginalExecId()));
@@ -94,17 +114,21 @@ void Storage::handleMessage(cMessage *cmsg) {
    jobId.append(std::to_string(msg->getRelativeJobId()));
 
    if(msg->getReBoot()==true){
-       EV<<"the failure of executor "<<msg->getOriginalExecId()<<" is detected by the storage"<<endl;
+       EV<<"The failure of executor "<<msg->getOriginalExecId()<<" ends:start the backup process from the storage"<<endl;
        executorReboot(jobId,&jobQueue);
        executorReboot(jobId,&newJobsQueue);
        executorReboot(jobId,&reRoutedQueue);
        executorReboot(jobId,&completedJobQueue);
 
+       EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
+
+
+
        msgBackup = new msg_check("End recover backup");
        msgBackup->setBackupComplete(true);
        msgBackup->setReBoot(true);
        send(msgBackup,"backup_rec$o");
-       EV<<"notify end of backup to executor"<<endl;
+       EV<<"Notify end of backup process to executor"<<endl;
 
    }else if(msg->getNewJobsQueue()==true){
            msg->setNewJobsQueue(true);
@@ -112,31 +136,33 @@ void Storage::handleMessage(cMessage *cmsg) {
            EV<<"working on NEWJOB map for: "<<jobId<<endl;
            newJobIdLength=newJobsQueue.size();
            emit(NewSignal,newJobIdLength);
-          // EV<<"   "<<newJobIdLength<<endl;
          }else if(msg->getJobQueue()==true){
                    msg->setJobQueue(true);
                    searchMessage(jobId,msg,&jobQueue);
                    EV<<"working on JOBID map for: "<<jobId<<endl;
                    jobIdLength=jobQueue.size();
                    emit(JobSignal,jobIdLength);
-                 //  EV<<"   "<<jobIdLength<<endl;
                 }else if(msg->getReRoutedJobQueue()==true){
                            msg->setReRoutedJobQueue(true);
                            searchMessage(jobId,msg,&reRoutedQueue);
                            EV<<"working on REROUTED map for: "<<jobId<<endl;
                            reRoutedJobIdLength=reRoutedQueue.size();
                            emit(ReRoutedSignal,reRoutedJobIdLength);
-                          // EV<<"   "<<reRoutedJobIdLength<<endl;
                        }else if(msg->getCompletedQueue()==true){
                                    msg->setCompletedQueue(true);
                                    searchMessage(jobId,msg,&completedJobQueue);
                                    EV<<"working on ENDED JOBS map for: "<<jobId<<endl;
                                    completedJobIdLength=completedJobQueue.size();
-                                   //EV<<"   "<<completedJobIdLength<<endl;
            }
 
    delete msg;
 }
+
+/*
+EXECUTOR REBOOT
+Invoked during the backup process for each map function.
+First it makes a copy of all the jobs in that map and then sends it to the executor with flag ReBoot=true
+*/
 
 void Storage::executorReboot(std::string jobId,std::map<std::string, msg_check *> *storedMap){
 
@@ -146,13 +172,24 @@ void Storage::executorReboot(std::string jobId,std::map<std::string, msg_check *
     for (search = storedMap->begin();search != storedMap->end(); ++search){
         msgBackup=search->second->dup();
         msgBackup->setReBoot(true);
-        EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
         send(msgBackup,"backup_rec$o");
     }
 }
+
+/*
+SEARCH MESSAGE
+Within the jobs coming from the executor there isn't any clue about whether that job is already present in that map or not.
+Therefore we must check this at the storage:
+    ->A found means that the job has already been inserted in that map;so we delete it because the only reason why the
+    executor will send the same job twice to his own storage is for a remove event
+    ->In case that job isn't found we add it in the map
+
+*/
+
+
 void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::string, msg_check *> *storedMap){
     std::map<std::string, msg_check *>::iterator search;
-    //Search if the job is already present
+
     search=storedMap->find(jobId);
     if (search != storedMap->end()){  //a key is found(the msg has already been inserted in that map)
         delete search->second;
@@ -160,15 +197,21 @@ void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::str
         EV<<"Erase "<<jobId<<" from storage"<<endl;
     }
     else{
-        //No job found, insert it as new job
+
         storedMap->insert(std::pair<std::string ,msg_check *>(jobId, msg->dup()));
         EV<<"New element with ID "<<jobId<< " added in the secure storage in the map "<<endl;
         EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
     }
 }
+
+/*
+FINISH
+At the end of the simulation print the length of all the four maps
+
+*/
 void Storage::finish()
 {
-    EV<<"END"<<endl;
+    EV<<"Map lengths at the END of the simulation"<<endl;
     EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<endl;
 
 }

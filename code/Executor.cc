@@ -15,7 +15,6 @@ private:
     simtime_t channelDelay;
     simtime_t timeoutLoad;
     simtime_t timeoutFailure;
-    simtime_t timeoutEndActual;
 
     int E,C,myId,granularity,skipLoad,probeResponse;
     double probEvent,probCrashDuringExecution;
@@ -79,9 +78,8 @@ void Executor::initialize() {
     skipLoad=granularity;
     channelDelay = par("channelDelay");
     timeoutLoad = par("timeoutLoad")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
-    timeoutFailure = par("timeoutFailure")+2*channelDelay;
-    timeoutEndActual = par("timeoutEndActual")+2*channelDelay;
-    EV<<"load "<<timeoutLoad<<" failure "<<timeoutFailure<<" end "<<timeoutEndActual<<endl;
+    timeoutFailure = par("timeoutFailure"); //nochanneldelay
+    EV<<"load "<<timeoutLoad<<" failure "<<timeoutFailure<<" end "<<endl;
     myId=getIndex();
     nNewJobArrived=0;
     jobCompleted=0;
@@ -699,10 +697,10 @@ void Executor::timeoutLoadBalancingHandler(){
         //EV<<"IIInsert job queue in storage giben that no load balancing is performed"<<endl;
         msgSend->setJobQueue(true);
         send(msgSend,"backup_send$o");
-        //chi lo dice che sono idle?nisuno
+        //chi lo dice che sono idle?
         if(!timeoutJobComputation->isScheduled()){
             timeoutJobComplexity = tmp->getJobComplexity();
-            EV<<"load balancing is useless and i am idle indeeed jobQueue length "<<jobQueue.getLength()<<endl;
+            EV<<"load balancing is useless and i am idle indeed jobQueue length "<<jobQueue.getLength()<<endl;
             scheduleAt(simTime()+timeoutJobComplexity, timeoutJobComputation);
         }
         jobQueue.insert(tmp);

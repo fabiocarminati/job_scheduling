@@ -1,4 +1,5 @@
-packet msg_check //name of the new type of message 
+//we define a new msg type with several fields
+packet msg_check 
 {
     unsigned int RelativeJobId;
     unsigned int ClientId;

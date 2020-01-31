@@ -4,6 +4,7 @@ network Net
         int C;
         int E;
         double channelDelay @unit(s);
+        double channelStorageDelay @unit(s);
       
         @display("bgb=718,496");
         @figure[description](type=text; pos=5,20; font=,,bold; text="Distributed job scheduling");
@@ -13,13 +14,12 @@ network Net
             parameters:
                 @display("p=100,200,c;");
             gates:
-                user[E];
-
+                links[E];
         }
-
+        
         executor[E]: Executor {
             parameters:
-                @display("p=327,191,ri"); //display elements in circle(see section 24 of the manual for the details
+                @display("p=327,191,ri"); //display executors of the cluster as a circle
             gates:
                 exec[C];
                 backup_send;
@@ -32,22 +32,22 @@ network Net
                 @display("p=150,90,m,90");
             gates:
                 backup_rec;
-
         }
+        
     connections:
+        //create the links amid clients and executors considering the transmission time over the channel
         for i=0..C-1, for j=0..E-1 {
-            // client[i].out --> queue.in++;
-            client[i].user[j] <--> {delay = channelDelay;} <--> executor[j].exec[i];
-
+            client[i].links[j] <--> {delay = channelDelay;} <--> executor[j].exec[i];
         }
+        
+        //create the links amid storage and executor considering the transmission time over the storage channel
         for k=0..E-1 {
-
-            executor[k].backup_send <--> {delay = channelDelay;} <--> backup[k].backup_rec;
-
+            executor[k].backup_send <--> {delay = channelStorageDelay;} <--> backup[k].backup_rec;
         }
-        for k=0..E-1, for r=0..E-1 {
+        
+        //create the links amid executors considering the transmission time over the channel
+        for k=0..E-1, for r=0..E-1{
             executor[k].load_send[r] --> {delay = channelDelay;} --> executor[r].load_receive[k];
-
         }
 
 }

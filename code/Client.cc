@@ -55,21 +55,21 @@ Client::~Client()
 
 void Client::initialize() {
     //initializing variables
-    simtime_t interArrivalTime;
+    simtime_t sendingTime;
 
     channelDelay= par("channelDelay");
     timeoutAck = par("timeoutAck")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
     timeoutStatus = par("timeoutStatus")+2*channelDelay;
     EV<<"ack "<<timeoutAck<<" status "<<timeoutStatus<<endl;
     E = par("E"); //non volatile parameters --once defined they never change
-    interArrivalTime = exponential(par("interArrivalTime").doubleValue()); //simulate an exponential generation of packets
+    sendingTime = exponential(par("sendingTime").doubleValue()); //simulate an exponential generation of packets
     maxRetry = par("maxRetry");
 
     avgSendingRateSignal = registerSignal("avgSendingRate");
     avgComplexitySignal = registerSignal("avgComplexity");
     realTimeSignal = registerSignal("realTime");
 
-    emit(avgSendingRateSignal,interArrivalTime);
+    emit(avgSendingRateSignal,sendingTime);
 
     sendNewJob = new msg_check("sendNewJob");
     timeoutAckNewJob = new msg_check("timeoutAckNewJob");
@@ -78,14 +78,14 @@ void Client::initialize() {
     clientId=getIndex();
 
     scheduleAt(simTime() + timeoutStatus, checkJobStatus);
-    scheduleAt(simTime() + interArrivalTime, sendNewJob);
+    scheduleAt(simTime() + sendingTime, sendNewJob);
 }
 
 void Client::handleMessage(cMessage *cmsg) {
     unsigned int executor;
     cObject *obj;
     msg_check *message;
-    simtime_t interArrivalTime, realComputationTime;
+    simtime_t sendingTime, realComputationTime;
     msg_check *msg = check_and_cast<msg_check *>(cmsg);
     const char  *jobId;
 
@@ -99,7 +99,7 @@ void Client::handleMessage(cMessage *cmsg) {
                         EV<<"Current Status Completed for "<<jobId<<endl;
                         executor = msg->getOriginalExecId();
                         realComputationTime=msg->getEndingTime()-msg->getStartingTime();
-                        send(msg,"user$o",executor);
+                        send(msg,"links$o",executor);
                         //delete the job from the list of the job currently in processing
                         EV<<"real computation time measured "<<realComputationTime<<endl;
                         emit(realTimeSignal,realComputationTime);
@@ -143,11 +143,11 @@ void Client::handleMessage(cMessage *cmsg) {
                         delete msgToAck;
                         msgToAck = nullptr;
                         //simulate an exponential generation of packets
-                        interArrivalTime=exponential(par("interArrivalTime").doubleValue());
-                        emit(avgSendingRateSignal,interArrivalTime);
-                        EV<<"Interarrival time "<<interArrivalTime<<endl;
+                        sendingTime=exponential(par("sendingTime").doubleValue());
+                        emit(avgSendingRateSignal,sendingTime);
+                        EV<<"Interarrival time "<<sendingTime<<endl;
                         //re-start the timer for new jobs
-                        scheduleAt(simTime()+interArrivalTime, sendNewJob);
+                        scheduleAt(simTime()+sendingTime, sendNewJob);
                     }else
                         delete msg;
                 }else
@@ -170,7 +170,7 @@ void Client::jobStatusHandler(){
            message->setStatusRequest(true);
            executor = message->getOriginalExecId();
            EV<<"Asking the status of: "<<message->getName()<<endl;
-           send(message,"user$o",executor);
+           send(message,"links$o",executor);
         }
         else
            EV << "FATAL ERROR: Erasing in executor from the notComputed queue: "<<endl;
@@ -196,7 +196,7 @@ void Client::selfMessage(msg_check *msg){
         message = new msg_check(msgname);
         message->setStatusRequest(false);
         message->setProbing(false);
-        jobComplexity=exponential(par("jobComplexity").doubleValue());
+        jobComplexity=exponential(par("jobComplexity").doubleValue());//no default
         message->setJobComplexity(jobComplexity);
         emit(avgComplexitySignal,jobComplexity);
         EV<<"job complexity "<<jobComplexity<<endl;
@@ -214,7 +214,7 @@ void Client::selfMessage(msg_check *msg){
         message->setEndingTime(SIMTIME_ZERO);
         EV<<"msg sent to machine "<<executor<<endl;
         msgToAck=message->dup();
-        send(message,"user$o",executor);  //send the message to the queue
+        send(message,"links$o",executor);  //send the message to the queue
         scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);//waiting ack
     }
     else
@@ -233,7 +233,7 @@ void Client::selfMessage(msg_check *msg){
             }
             //EV<<"maxretry when ack expired "<<maxRetry<<endl;
             EV << "Timeout expired, re-sending message and restarting timer"<<endl;
-            send(msgToAck->dup(),"user$o",msgToAck->getOriginalExecId());
+            send(msgToAck->dup(),"links$o",msgToAck->getOriginalExecId());
             //start the timeout for the re-transmission
             scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);
         }
