@@ -10,7 +10,7 @@ simple Executor
         double probCrashDuringExecution;
 		double channelDelay @unit(s);
 		double timeoutLoad @unit(s);
-        double timeoutFailure @unit(s);
+        volatile double timeoutFailure @unit(s);
 
     gates:
         inout exec[]; // C bidirectional links with the clients

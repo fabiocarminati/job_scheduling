@@ -76,10 +76,11 @@ Storage::~Storage()
 }
 
 /*
-INITIALIZE
+ * INITIALIZE
 At the beginning of the simulation all the various queues are empty so we set equal to 0 the first emitted value for the signals representing
 the length of the jobQueue,newJobsQueue and reRouted
  */
+
 void Storage::initialize() {
     JobSignal = registerSignal("Job");
     NewSignal = registerSignal("NewJobs");
@@ -90,7 +91,7 @@ void Storage::initialize() {
 }
 
 /*
-HANDLE MESSAGE
+ * HANDLE MESSAGE
 Different actions according to the type of message received by the executor:
     ->Message notifying that the executor has ended the failure mode:the storage will reply sending all the jobs contained in his four maps
     followed by a final message with the flag BackupComplete=true so that the executor understands that the backup process is over.
@@ -99,7 +100,6 @@ Different actions according to the type of message received by the executor:
 
 Finally the incoming msg is deleted
  */
-
 
 void Storage::handleMessage(cMessage *cmsg) {
    // Casting from cMessage to msg_check
@@ -115,6 +115,7 @@ void Storage::handleMessage(cMessage *cmsg) {
 
    if(msg->getReBoot()==true){
        EV<<"The failure of executor "<<msg->getOriginalExecId()<<" ends:start the backup process from the storage"<<endl;
+       bubble("Start sending backup copies to the executor");
        executorReboot(jobId,&jobQueue);
        executorReboot(jobId,&newJobsQueue);
        executorReboot(jobId,&reRoutedQueue);
@@ -159,7 +160,7 @@ void Storage::handleMessage(cMessage *cmsg) {
 }
 
 /*
-EXECUTOR REBOOT
+ * EXECUTOR REBOOT
 Invoked during the backup process for each map function.
 First it makes a copy of all the jobs in that map and then sends it to the executor with flag ReBoot=true
 */
@@ -177,15 +178,13 @@ void Storage::executorReboot(std::string jobId,std::map<std::string, msg_check *
 }
 
 /*
-SEARCH MESSAGE
+ * SEARCH MESSAGE
 Within the jobs coming from the executor there isn't any clue about whether that job is already present in that map or not.
 Therefore we must check this at the storage:
     ->A found means that the job has already been inserted in that map;so we delete it because the only reason why the
     executor will send the same job twice to his own storage is for a remove event
     ->In case that job isn't found we add it in the map
-
 */
-
 
 void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::string, msg_check *> *storedMap){
     std::map<std::string, msg_check *>::iterator search;
@@ -205,10 +204,10 @@ void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::str
 }
 
 /*
-FINISH
+ * FINISH
 At the end of the simulation print the length of all the four maps
-
 */
+
 void Storage::finish()
 {
     EV<<"Map lengths at the END of the simulation"<<endl;
