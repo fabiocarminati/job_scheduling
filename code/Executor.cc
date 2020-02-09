@@ -34,7 +34,6 @@ private:
 
     simtime_t channelDelay;
     simtime_t timeoutLoad;
-    simtime_t timeoutFailure;
 
     int E,myId,granularity,skipLoad,probeResponse;
     double probEvent,probCrashDuringExecution;
@@ -103,7 +102,6 @@ void Executor::initialize() {
     skipLoad=granularity;
     channelDelay = par("channelDelay");
     timeoutLoad = par("timeoutLoad")+2*channelDelay; //the channelDelay should be considered twice in the timeouts:one for the send and one for the reply(2 accesses to the channel)
-    timeoutFailure = par("timeoutFailure");
     myId=getIndex();
     nNewJobArrived=0;
     jobCompleted=0;
@@ -135,7 +133,7 @@ void Executor::handleMessage(cMessage *cmsg) {
    failureEvent(probEvent);
    if(failure){
        if(msg==timeoutFailureEnd) {
-            //After the expiration of the timeoutFailure a message is sent to the storage such that the backup process can start.
+            //After the expiration of the timeoutFailureDuration a message is sent to the storage such that the backup process can start.
             msgSend = new msg_check("Failure end");
             msgSend->setReBoot(true);
             msgSend->setActualExecId(myId);
@@ -228,7 +226,7 @@ parameter. In case the failure occurs we made some assumptions on how it should 
      ->The executor goes in FAILURE MODE
      ->The executor stops to wait for load balancing responses(probingMode=false)
      ->Any timeout that will generate a self event in the future is interrupted
-Then the timeoutFailure is started and until his expiration any other incoming message will be discarded by the executor(failure mode).
+Then the timeoutFailureDuration is started and until his expiration any other incoming message will be discarded by the executor(failure mode).
 */
 
 void Executor::failureEvent(double prob){
