@@ -21,7 +21,12 @@ It contains five fundamental elements:
 
 The total number of completed jobs by each executor at the end of the simulation is printed at the end of the simulation.
 
-Please notice that in this document we use job,message,packet as synonyms.
+N.B.In this document we use job,message,packet as synonyms
+    In this document we refer to original executor as the executor to which the job is sent by the client
+    In this document we refer to actual executor as the executor that processes the job
+    Actual exec!=Orignal exec if reRouting is performed due to load balancing
+    Actual exec==Orignal exec if load balancing isn't performed
+    Anyway only the original executor can communicate with the client and not the actual executor
  */
 
 class Executor : public cSimpleModule {
@@ -96,7 +101,7 @@ the other variables that we will need.
 
 void Executor::initialize() {
     probingMode = false;
-    E = par("E"); //non volatile parameters --once defined they never change
+    E = par("E");
     granularity = par("granularity");
     probeResponse = par("probeResponse");
     skipLoad=granularity;
@@ -485,7 +490,7 @@ void Executor::balancedJob(msg_check *msg){
                  return;
              }
              send(msgSend,"load_send",i);
-             EV<<"Asking the load to machine "<<msgSend->getActualExecId()<<endl;
+             EV<<"Asking the load to executor "<<msgSend->getActualExecId()<<endl;
              }
         }
         scheduleAt(simTime()+timeoutLoad, timeoutLoadBalancing);
@@ -784,12 +789,12 @@ void Executor::newJobHandler(msg_check *msg){
     msg_check *msgSend;
     const char *id;
     std::string jobId;
-    int machine, clientId;
+    int exec, clientId;
     simtime_t timeoutJobComplexity;
     nNewJobArrived++;
     //Create the JobId
-    machine=msg->getOriginalExecId();
-    jobId.append(std::to_string(machine));
+    exec=msg->getOriginalExecId();
+    jobId.append(std::to_string(exec));
     jobId.append("-");
     jobId.append(std::to_string(nNewJobArrived));
     id=jobId.c_str();
@@ -896,7 +901,7 @@ void Executor::timeoutLoadBalancingHandler(){
         tmp->setQueueLength(-1);
         tmp->setActualExecId(actualExec);
         //bubble("Load balancing");
-        EV<<"Send to the machine "<<actualExec<<" that has a lower queue the "<<tmp->getRelativeJobId()<<endl;
+        EV<<"Send to the executor "<<actualExec<<" that has a lower queue the "<<tmp->getRelativeJobId()<<endl;
         failureEvent(probCrashDuringExecution);
         if(failure){
             EV<<"crash in the middle of sending load balancing:I will keep it myself "<<endl;
@@ -942,7 +947,7 @@ void Executor::timeoutJobExecutionHandler(){
     completedJob.add(msgServiced);
 
     if(jobQueue.isEmpty())
-      EV<<"Empty jobQueue, the machine "<<myId<<" goes IDLE"<<endl;
+      EV<<"Empty jobQueue, the executor "<<myId<<" goes IDLE"<<endl;
     else{
          msgServiced = check_and_cast<msg_check *>(jobQueue.front());
          jobId = msgServiced->getName();

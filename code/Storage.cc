@@ -22,7 +22,12 @@ number of completed jobs but also to the number and to frequency of the status r
 Anyway in order to have an idea about the total number of completed jobs by each executor at the end of the simulation we print
 that value.
 
-Please notice that in this document we use job,message,packet as synonyms.
+N.B.In this document we use job,message,packet as synonyms
+    In this document we refer to original executor as the executor to which the job is sent by the client
+    In this document we refer to actual executor as the executor that processes the job
+    Actual exec!=Orignal exec if reRouting is performed due to load balancing
+    Actual exec==Orignal exec if load balancing isn't performed
+    Anyway only the original executor can communicate with the client and not the actual executor
  */
 
 class Storage : public cSimpleModule {
