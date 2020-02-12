@@ -1,6 +1,6 @@
 #include <string.h>
 #include <omnetpp.h>
-#include <msg_check_m.h>
+#include <JobMessage_m.h>
 #include <map>
 using namespace omnetpp;
 
@@ -9,7 +9,7 @@ This class represents a secure storage(his content will never be lost).
 There is one secure storage for each executor.
 It can send and receive messages only to/from the correspondent executor
 It contains four distinct map functions which have the job ID as key and the job as value:
-     ->The map function newJobsQueue: the executor hasn't decided yet how to handle these messages.Several actions are possible:
+     ->The map function newJobsQueue: the executor hasn't decided yet how to handle these messages. Several actions are possible:
      1. Send the job to another executor in order to perform load balancing
      2. Keep the job and execute it either immediately if idle or in the future
      ->The map function jobQueue that contains all the messages waiting to be processed by that executor with a FIFO logic
@@ -33,13 +33,13 @@ N.B.In this document we use job,message,packet as synonyms
 class Storage : public cSimpleModule {
 private:
 
-    std::map<std::string, msg_check *> newJobsQueue;
-    std::map<std::string, msg_check *> jobQueue;
-    std::map<std::string, msg_check *> reRoutedQueue;
-    std::map<std::string, msg_check *> completedJobQueue;
+    std::map<std::string, JobMessage *> newJobsQueue;
+    std::map<std::string, JobMessage *> jobQueue;
+    std::map<std::string, JobMessage *> reRoutedQueue;
+    std::map<std::string, JobMessage *> completedJobQueue;
 
-    void searchMessage(std::string jobId,  msg_check *msg, std::map<std::string, msg_check *> *storedMap);
-    void executorReboot(std::string jobId,std::map<std::string, msg_check *> *storedMap);
+    void searchMessage(std::string jobId,  JobMessage *msg, std::map<std::string, JobMessage *> *storedMap);
+    void executorReboot(std::string jobId,std::map<std::string, JobMessage *> *storedMap);
 
 
 
@@ -68,7 +68,7 @@ Storage::Storage()
 }
 Storage::~Storage()
 {
-    std::map<std::string, msg_check *>::iterator search;
+    std::map<std::string, JobMessage *>::iterator search;
 
     for (search = newJobsQueue.begin();search != newJobsQueue.end(); ++search)
          delete search->second;
@@ -107,9 +107,9 @@ Finally the incoming msg is deleted
  */
 
 void Storage::handleMessage(cMessage *cmsg) {
-   // Casting from cMessage to msg_check
-   msg_check *msg = check_and_cast<msg_check *>(cmsg);
-   msg_check *msgBackup;
+   // Casting from cMessage to JobMessage
+   JobMessage *msg = check_and_cast<JobMessage *>(cmsg);
+   JobMessage *msgBackup;
    std::string jobId;
 
    double jobIdLength,newJobIdLength,reRoutedJobIdLength,completedJobIdLength;
@@ -130,7 +130,7 @@ void Storage::handleMessage(cMessage *cmsg) {
 
 
 
-       msgBackup = new msg_check("End recover backup");
+       msgBackup = new JobMessage("End recover backup");
        msgBackup->setBackupComplete(true);
        msgBackup->setReBoot(true);
        send(msgBackup,"backup_rec$o");
@@ -170,10 +170,10 @@ Invoked during the backup process for each map function.
 First it makes a copy of all the jobs in that map and then sends it to the executor with flag ReBoot=true
 */
 
-void Storage::executorReboot(std::string jobId,std::map<std::string, msg_check *> *storedMap){
+void Storage::executorReboot(std::string jobId,std::map<std::string, JobMessage *> *storedMap){
 
-    msg_check *msgBackup;
-    std::map<std::string, msg_check *>::iterator search;
+    JobMessage *msgBackup;
+    std::map<std::string, JobMessage *>::iterator search;
 
     for (search = storedMap->begin();search != storedMap->end(); ++search){
         msgBackup=search->second->dup();
@@ -191,18 +191,18 @@ Therefore we must check this at the storage:
     ->In case that job isn't found we add it in the map
 */
 
-void Storage::searchMessage(std::string jobId, msg_check *msg, std::map<std::string, msg_check *> *storedMap){
-    std::map<std::string, msg_check *>::iterator search;
+void Storage::searchMessage(std::string jobId, JobMessage *msg, std::map<std::string, JobMessage *> *storedMap){
+    std::map<std::string, JobMessage *>::iterator search;
 
     search=storedMap->find(jobId);
-    if (search != storedMap->end()){  //a key is found(the msg has already been inserted in that map)
+    if (search != storedMap->end()){  //a key is found(the message has already been inserted in that map)
         delete search->second;
         storedMap->erase(jobId);
         EV<<"Erase "<<jobId<<" from storage"<<endl;
     }
     else{
 
-        storedMap->insert(std::pair<std::string ,msg_check *>(jobId, msg->dup()));
+        storedMap->insert(std::pair<std::string ,JobMessage *>(jobId, msg->dup()));
         EV<<"New element with ID "<<jobId<< " added in the secure storage in the map "<<endl;
         EV<<"JOB "<<jobQueue.size()<<" NEW "<<newJobsQueue.size()<<" REROUTED "<<reRoutedQueue.size() <<" ENDED "<<completedJobQueue.size()<<" job id "<<jobId<<endl;
     }

@@ -1,6 +1,6 @@
 #include <string.h>
 #include <omnetpp.h>
-#include <msg_check_m.h>
+#include <JobMessage_m.h>
 #include <map>
 
 using namespace omnetpp;
@@ -37,17 +37,17 @@ private:
   int clientId;
   int E;
   int maxRetry;
-  msg_check *sendNewJob;
-  msg_check *timeoutAckNewJob;
-  msg_check *checkJobStatus;
-  msg_check *msgToAck;
+  JobMessage *sendNewJob;
+  JobMessage *timeoutAckNewJob;
+  JobMessage *checkJobStatus;
+  JobMessage *msgToAck;
   simtime_t timeoutAck;
   simtime_t timeoutStatus;
 
   cArray notComputed;
   cArray noStatusInfo;
   void jobStatusHandler();
-  void selfMessage(msg_check *msg);
+  void selfMessage(JobMessage *msg);
 
 protected:
   virtual void initialize();
@@ -81,7 +81,7 @@ Client::~Client()
  * INITIALIZE
 At the beginning of the simulation we:
     ->Recover all the parameters of the module Client
-    ->Schedule the generation of a job after at time equal to sendingTime and emit the respective avgSendingRateSignal signal
+    ->Schedule the generation of a new job after at time equal to sendingTime and emit the respective avgSendingRateSignal signal
     ->Schedule the after at time equal to timeoutStatus the sending of the status requests for the jobs inside the cArray notComputed
 */
 
@@ -102,9 +102,9 @@ void Client::initialize() {
 
     emit(avgSendingRateSignal,sendingTime);
 
-    sendNewJob = new msg_check("sendNewJob");
-    timeoutAckNewJob = new msg_check("timeoutAckNewJob");
-    checkJobStatus = new msg_check("checkJobStatus");
+    sendNewJob = new JobMessage("sendNewJob");
+    timeoutAckNewJob = new JobMessage("timeoutAckNewJob");
+    checkJobStatus = new JobMessage("checkJobStatus");
     clientId=getIndex();
 
     scheduleAt(simTime() + timeoutStatus, checkJobStatus);
@@ -127,9 +127,9 @@ Different actions according to the type of message received by the client:
 void Client::handleMessage(cMessage *cmsg) {
     unsigned int executor;
     cObject *obj;
-    msg_check *message;
+    JobMessage *message;
     simtime_t sendingTime, realComputationTime;
-    msg_check *msg = check_and_cast<msg_check *>(cmsg);
+    JobMessage *msg = check_and_cast<JobMessage *>(cmsg);
     const char  *jobId;
 
     jobId = msg->getName();
@@ -158,7 +158,7 @@ void Client::handleMessage(cMessage *cmsg) {
                         EV<<"NOT COMPLETED status info received for: "<<jobId<<endl;
                         obj = noStatusInfo.remove(jobId);
                         if (obj!=nullptr){
-                           message = check_and_cast<msg_check *>(obj);
+                           message = check_and_cast<JobMessage *>(obj);
                            EV << "Put the job "<<jobId<<" into notComputed cArray such that the client will reAask his status later"<<endl;
                            notComputed.add(message);
                         }
@@ -200,14 +200,14 @@ N.B
 
 void Client::jobStatusHandler(){
     int i;
-    msg_check *message,*msgStore;
+    JobMessage *message,*msgStore;
     cObject *obj;
     int executor;
 
     for (i = 0;i < notComputed.size();i++){
         obj = notComputed.remove(i);
         if (obj!=nullptr){
-           message = check_and_cast<msg_check *>(obj);
+           message = check_and_cast<JobMessage *>(obj);
            msgStore = message->dup();
            noStatusInfo.add(msgStore);
            message->setStatusRequest(true);
@@ -235,16 +235,16 @@ Handles the self messages:
     ->checkJobStatus: invoke the function that sends the status requests messages (jobStatusHandler())
  */
 
-void Client::selfMessage(msg_check *msg){
+void Client::selfMessage(JobMessage *msg){
     int executor;
-    msg_check *message;
+    JobMessage *message;
     simtime_t jobComplexity;
 
     if (msg == sendNewJob){
         maxRetry=par("maxRetry");
         executor=rand() % E;
 
-        message = new msg_check(" ");
+        message = new JobMessage(" ");
         message->setStatusRequest(false);
         message->setProbing(false);
         jobComplexity=exponential(par("jobComplexity").doubleValue());//no default

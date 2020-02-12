@@ -2,7 +2,6 @@ simple Executor
 {    
     parameters:
 		@display("i=block/queue");
-		int C;
         int E;
         int granularity;
         int probeResponse;
