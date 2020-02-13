@@ -7,7 +7,7 @@ using namespace omnetpp;
 /*
  This class represents an executor.
 
-It can communicate both with the C clients and with the other E-1 executors
+It can communicate both with the C clients and with the others E-1 executors
 It contains five fundamental elements:
      ->The cArray completedJob:contains all the jobs whose execution is ended.
      A completed job stays in this cArray until the client asks for his status.

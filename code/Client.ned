@@ -2,8 +2,8 @@ simple Client
 {
     parameters:
         @display("i=block/source");
-        volatile double sendingTime @unit(s); 
-        volatile double jobComplexity @unit(s);
+        double sendingTime @unit(s); 
+        double jobComplexity @unit(s);
         double channelDelay @unit(s);
         double timeoutAck @unit(s);
         double timeoutStatus @unit(s);
