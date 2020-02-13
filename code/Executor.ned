@@ -12,8 +12,8 @@ simple Executor
         double timeoutFailure @unit(s);
 
     gates:
-        inout client[]; // C bidirectional links with the clients
-        inout backup; // a bidirectional link with the storage
+        inout clientGate[]; // C bidirectional links with the clients
+        inout storageGate; // a bidirectional link with the storage
         // E-1 links from and to the other executors of the cluster
-        inout executor[];
+        inout executorGate[];
 }

@@ -16,6 +16,6 @@ simple Storage
      	@statistic[ReRouted](title=" REROUTED JOB QUEUE";record=vector, timeavg;interpolationmode=sample-hold);
         
     gates:
-        // a single bidirectional link from and to his executor
-        inout executor; 
+        // a single bidirectional gate from and to his executor
+        inout executorGate; 
 }

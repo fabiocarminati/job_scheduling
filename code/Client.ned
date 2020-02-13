@@ -23,6 +23,6 @@ simple Client
         @statistic[avgComplexity](title="JOB COMPLEXITY";record=vector, timeavg;interpolationmode=sample-hold);
       	
     gates:
-         // E bidirectional links which each of the executors
-        inout executor[];
+         // E bidirectional gates which each of the executors
+        inout executorGate[];
 }
