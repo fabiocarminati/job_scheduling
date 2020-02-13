@@ -133,7 +133,7 @@ void Storage::handleMessage(cMessage *cmsg) {
        msgBackup = new JobMessage("End recover backup");
        msgBackup->setBackupComplete(true);
        msgBackup->setReBoot(true);
-       send(msgBackup,"backup_rec$o");
+       send(msgBackup,"executor$o");
        EV<<"Notify end of backup process to executor"<<endl;
 
    }else if(msg->getNewJobsQueue()==true){
@@ -178,7 +178,7 @@ void Storage::executorReboot(std::string jobId,std::map<std::string, JobMessage 
     for (search = storedMap->begin();search != storedMap->end(); ++search){
         msgBackup=search->second->dup();
         msgBackup->setReBoot(true);
-        send(msgBackup,"backup_rec$o");
+        send(msgBackup,"executor$o");
     }
 }
 

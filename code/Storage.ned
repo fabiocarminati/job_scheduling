@@ -17,5 +17,5 @@ simple Storage
         
     gates:
         // a single bidirectional link from and to his executor
-        inout backup_rec; 
+        inout executor; 
 }

@@ -142,7 +142,7 @@ void Client::handleMessage(cMessage *cmsg) {
                         EV<<"COMPLETED status info received for: "<<jobId<<endl;
                         executor = msg->getOriginalExecId();
                         realComputationTime=msg->getEndingTime()-msg->getStartingTime();
-                        send(msg,"links$o",executor);
+                        send(msg,"executor$o",executor);
                         if(noStatusInfo.exist(jobId)){
                             EV<<"Total Service time client side: "<<realComputationTime<<endl;
                             emit(realTimeSignal,realComputationTime);
@@ -213,7 +213,7 @@ void Client::jobStatusHandler(){
            message->setStatusRequest(true);
            executor = message->getOriginalExecId();
            EV<<"Asking the status of: "<<message->getName()<<endl;
-           send(message,"links$o",executor);
+           send(message,"executor$o",executor);
         }
         else
            EV << "FATAL ERROR during erase in notComputed cArray of the client: "<<clientId<<endl;
@@ -264,7 +264,7 @@ void Client::selfMessage(JobMessage *msg){
         message->setEndingTime(SIMTIME_ZERO);
         EV<<"Job sent to original executor "<<executor<<endl;
         msgToAck=message->dup();
-        send(message,"links$o",executor);
+        send(message,"executor$o",executor);
         scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);
     }
     else
@@ -281,7 +281,7 @@ void Client::selfMessage(JobMessage *msg){
                EV<<"Change destination executor: "<<executor<<endl;
             }
             EV << "timeoutAck expired, re-sending the same job and restarting timer"<<endl;
-            send(msgToAck->dup(),"links$o",msgToAck->getOriginalExecId());
+            send(msgToAck->dup(),"executor$o",msgToAck->getOriginalExecId());
             scheduleAt(simTime()+timeoutAck, timeoutAckNewJob);
         }
         else

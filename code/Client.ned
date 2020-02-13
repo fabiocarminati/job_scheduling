@@ -24,5 +24,5 @@ simple Client
       	
     gates:
          // E bidirectional links which each of the executors
-        inout links[];
+        inout executor[];
 }
