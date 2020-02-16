@@ -38,7 +38,7 @@ private:
     std::map<std::string, JobMessage *> reRoutedQueue;
     std::map<std::string, JobMessage *> completedJobQueue;
 
-    void searchMessage(std::string jobId,  JobMessage *msg, std::map<std::string, JobMessage *> *storedMap);
+    void searchJob(std::string jobId,  JobMessage *msg, std::map<std::string, JobMessage *> *storedMap);
     void executorReboot(std::string jobId,std::map<std::string, JobMessage *> *storedMap);
 
 
@@ -138,25 +138,25 @@ void Storage::handleMessage(cMessage *cmsg) {
 
    }else if(msg->getNewJobsQueue()==true){
            msg->setNewJobsQueue(true);
-           searchMessage(jobId,msg,&newJobsQueue);
+           searchJob(jobId,msg,&newJobsQueue);
            EV<<"working on NEWJOB map for: "<<jobId<<endl;
            newJobIdLength=newJobsQueue.size();
            emit(NewSignal,newJobIdLength);
          }else if(msg->getJobQueue()==true){
                    msg->setJobQueue(true);
-                   searchMessage(jobId,msg,&jobQueue);
+                   searchJob(jobId,msg,&jobQueue);
                    EV<<"working on JOBID map for: "<<jobId<<endl;
                    jobIdLength=jobQueue.size();
                    emit(JobSignal,jobIdLength);
                 }else if(msg->getReRoutedJobQueue()==true){
                            msg->setReRoutedJobQueue(true);
-                           searchMessage(jobId,msg,&reRoutedQueue);
+                           searchJob(jobId,msg,&reRoutedQueue);
                            EV<<"working on REROUTED map for: "<<jobId<<endl;
                            reRoutedJobIdLength=reRoutedQueue.size();
                            emit(ReRoutedSignal,reRoutedJobIdLength);
                        }else if(msg->getCompletedQueue()==true){
                                    msg->setCompletedQueue(true);
-                                   searchMessage(jobId,msg,&completedJobQueue);
+                                   searchJob(jobId,msg,&completedJobQueue);
                                    EV<<"working on ENDED JOBS map for: "<<jobId<<endl;
                                    completedJobIdLength=completedJobQueue.size();
            }
@@ -191,7 +191,7 @@ Therefore we must check this at the storage:
     ->In case that job isn't found we add it in the map
 */
 
-void Storage::searchMessage(std::string jobId, JobMessage *msg, std::map<std::string, JobMessage *> *storedMap){
+void Storage::searchJob(std::string jobId, JobMessage *msg, std::map<std::string, JobMessage *> *storedMap){
     std::map<std::string, JobMessage *>::iterator search;
 
     search=storedMap->find(jobId);

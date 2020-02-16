@@ -695,7 +695,7 @@ void Executor::statusRequestHandler(JobMessage *msg){
              tmp->setActualExecId(tmp->getOriginalExecId());
              send(tmp,"clientGate$o",portId);
          }
-      }else{//because the client will reply to the status reply
+      }else{
           if(msg->getIsEnded()){
                    obj = completedJob.remove(jobId);
                    if (obj!=nullptr){
@@ -799,7 +799,6 @@ void Executor::newJobHandler(JobMessage *msg){
     jobId.append("-");
     jobId.append(std::to_string(nNewJobArrived));
     id=jobId.c_str();
-    //save the message to the stable storage
     msg->setRelativeJobId(nNewJobArrived);
 
     //Reply to the client
@@ -929,7 +928,6 @@ void Executor::timeoutJobExecutionHandler(){
     simtime_t timeoutJobComplexity;
     JobMessage *msgServiced,*msgSend;
 
-    // Retrieve the source_id of the message that just finished service
     msgServiced = check_and_cast<JobMessage *>(jobQueue.pop());
     jobId = msgServiced->getName();
     clientId = msgServiced->getClientId();
@@ -986,10 +984,6 @@ void Executor::selfMessage(JobMessage *msg){
           timeoutLoadBalancingHandler();
        }else
 
-       /* SELF-MESSAGE HAS ARRIVED
-
-
-       */
            if (msg == timeoutJobComputation){
               timeoutJobExecutionHandler();
            }

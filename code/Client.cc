@@ -82,7 +82,7 @@ Client::~Client()
 At the beginning of the simulation we:
     ->Recover all the parameters of the module Client
     ->Schedule the generation of a new job after at time equal to sendingTime and emit the respective avgSendingRateSignal signal
-    ->Schedule the after at time equal to timeoutStatus the sending of the status requests for the jobs inside the cArray notComputed
+    ->Schedule after a time equal to timeoutStatus the sending of the status requests for the jobs inside the cArray notComputed
 */
 
 void Client::initialize() {
@@ -195,7 +195,7 @@ N.B
     are in failure mode at that moment. Thus if sending a new status request to them will be useless and will only add traffic on the links.
     Thus the jobs are moved from notComputed to noStatusInfo such that we don't send another status request for the same job before the
     original executor replies to the first one(and this will happen after the executor comes back from a failure
-    --->see executor->updateJobsStatus().)
+    --->see executor->updateJobsStatus())
 */
 
 void Client::jobStatusHandler(){
@@ -231,7 +231,7 @@ Handles the self messages:
     ->timeoutAckNewJob:the timeoutAck has expired(the original executor hasn't replied with the jobId)
         ->the client reTries to transmit the same job to the same executor up to maxRetry times. If the the original executor still
         doesn't reply for maxRetry times the client assumes that it isn't available and thus sends the job to a new executor.
-        N.B The starting time field of the job isn't changed
+        N.B The starting time field of the job isn't changed(for the realTimeSignal signal)
     ->checkJobStatus: invoke the function that sends the status requests messages (jobStatusHandler())
  */
 
