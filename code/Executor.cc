@@ -685,8 +685,6 @@ void Executor::statusRequestHandler(JobMessage *msg){
                      tmp = msg->dup();
                      tmp->setReRouted(false);
                      send(tmp,"executorGate$o",portId);
-                 }else{
-                     EV << "FATAL ERROR: Erasing in executor from the re-routed job queue: "<<jobId<<endl;
                  }
              }
              portId = msg->getClientId();
@@ -704,9 +702,7 @@ void Executor::statusRequestHandler(JobMessage *msg){
                        tmp->setCompletedQueue(true);
                        send(tmp,"storageGate$o");//notify erase in completed job queue to the storage
                    }
-                   else{
-                       EV << "FATAL ERROR: Erasing in executor from the completed job queue: "<<jobId<<endl;
-                   }
+                   
           }
       }
     }
