@@ -1,4 +1,5 @@
 # DISTRIBUTED JOB SCHEDULING
+This repository contains the Distributed System project (2019-2020) by Fabio Carminati and Filippo Carloni.
 
 We have used Omnet++ to implement and model an infrastructure to manage jobs submitted to a cluster of Executors.
 
