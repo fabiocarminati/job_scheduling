@@ -103,7 +103,11 @@ In the Storage :
 ## Results
 Considering these simulation parameters:
 ![](no_failure_opt_load_ini_file.png)
+
 We obtain the following results:
-![](1.jpg)
+![](end_simulation_values.png)
+
+![](signals_2,4,no_failure,optimal_load.png)
+
 # License
 This project is licensed under the MIT License - see the LICENSE.md file for details
